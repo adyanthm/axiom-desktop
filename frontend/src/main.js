@@ -2,7 +2,6 @@ import './style.css';
 import { EditorState } from '@codemirror/state';
 import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, drawSelection } from '@codemirror/view';
 import { defaultKeymap, indentWithTab, history, historyKeymap } from '@codemirror/commands';
-import { python } from '@codemirror/lang-python';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { autocompletion } from '@codemirror/autocomplete';
 import { searchKeymap, search } from '@codemirror/search';
@@ -15,6 +14,41 @@ import { listen } from '@tauri-apps/api/event';
 import { Terminal } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
 import 'xterm/css/xterm.css';
+
+// ── Language Loader ────────────────────────────────────────────────────────────
+const languageRegistry = {
+  js: () => import('@codemirror/lang-javascript').then(m => m.javascript()),
+  ts: () => import('@codemirror/lang-javascript').then(m => m.javascript({ typescript: true })),
+  jsx: () => import('@codemirror/lang-javascript').then(m => m.javascript({ jsx: true })),
+  tsx: () => import('@codemirror/lang-javascript').then(m => m.javascript({ jsx: true, typescript: true })),
+  html: () => import('@codemirror/lang-html').then(m => m.html()),
+  css: () => import('@codemirror/lang-css').then(m => m.css()),
+  json: () => import('@codemirror/lang-json').then(m => m.json()),
+  md: () => import('@codemirror/lang-markdown').then(m => m.markdown()),
+  py: () => import('@codemirror/lang-python').then(m => m.python()),
+  rs: () => import('@codemirror/lang-rust').then(m => m.rust()),
+  cpp: () => import('@codemirror/lang-cpp').then(m => m.cpp()),
+  c: () => import('@codemirror/lang-cpp').then(m => m.cpp()),
+  java: () => import('@codemirror/lang-java').then(m => m.java()),
+  php: () => import('@codemirror/lang-php').then(m => m.php()),
+};
+
+const loadedLanguages = new Map();
+
+async function getLanguageExtension(ext) {
+  ext = ext?.toLowerCase();
+  if (loadedLanguages.has(ext)) return loadedLanguages.get(ext);
+  const loader = languageRegistry[ext];
+  if (!loader) return [];
+  try {
+    const langExt = await loader();
+    loadedLanguages.set(ext, langExt);
+    return langExt;
+  } catch (e) {
+    console.error(`Failed to load language extension for ${ext}:`, e);
+    return [];
+  }
+}
 
 // ── Tauri Detection ────────────────────────────────────────────────────────────
 const IS_TAURI = '__TAURI_INTERNALS__' in window;
@@ -90,7 +124,7 @@ function pathBasename(p) { return p.split(/[\\/]/).pop(); }
 function pathDirname(p) { const i = Math.max(p.lastIndexOf('/'), p.lastIndexOf('\\')); return i < 0 ? '' : p.substring(0, i); }
 
 // ── Editor Factory ─────────────────────────────────────────────────────────────
-function createEditorState(content) {
+function createEditorState(content, langExt = []) {
   return EditorState.create({
     doc: content,
     extensions: [
@@ -103,7 +137,7 @@ function createEditorState(content) {
       autocompletion(),
       search({ top: true }),
       keymap.of([...searchKeymap, ...defaultKeymap, ...historyKeymap, indentWithTab]),
-      python(),
+      langExt,
       oneDark,
       EditorView.lineWrapping,
       EditorView.updateListener.of((update) => {
@@ -579,17 +613,26 @@ function renderTabs() {
   const c = document.getElementById('tabs-container');
   if (!c) return;
   c.innerHTML = '';
+  let activeTabEl = null;
   openTabs.forEach(fp => {
     const fn = pathBasename(fp);
     const dirty = dirtyFiles.has(fp);
     const div = document.createElement('div');
-    div.className = 'tab' + (fp === currentFile ? ' active' : '');
+    const isActive = fp === currentFile;
+    div.className = 'tab' + (isActive ? ' active' : '');
     div.dataset.file = fp;
     div.innerHTML = `${getFileIcon(fn)}<span class="tab-title">${fn}</span><div class="tab-close-btn ${dirty ? 'is-dirty' : ''}">${dirty ? '<span class="tab-dot">●</span>' : '<i class="fa-solid fa-xmark"></i>'}</div>`;
     div.addEventListener('click', e => { if (!e.target.closest('.tab-close-btn')) openFile(fp); });
     div.querySelector('.tab-close-btn').addEventListener('click', e => { e.stopPropagation(); closeTab(fp); });
     c.appendChild(div);
+    if (isActive) activeTabEl = div;
   });
+
+  if (activeTabEl) {
+    setTimeout(() => {
+      activeTabEl.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    }, 10);
+  }
 }
 
 function patchTabDirty(fp) {
@@ -620,7 +663,11 @@ async function openFile(filePath, focusEditor = true) {
       content = await invoke('read_file_text', { path: filePath });
       fileContents.set(filePath, content);
     } catch (e) { console.error('Read failed:', e); return; }
-    fileEditorStates.set(filePath, createEditorState(content));
+    
+    const ext = filePath.split('.').pop();
+    const langExt = await getLanguageExtension(ext);
+    
+    fileEditorStates.set(filePath, createEditorState(content, langExt));
   }
 
   if (!openTabs.includes(filePath)) openTabs.push(filePath);
@@ -832,6 +879,10 @@ function updateBreadcrumb(filePath) {
     const icon = isLast ? getFileIcon(p) : (isFirst ? '' : '<i class="fa-solid fa-folder" style="color:#E8AB4F;font-size:11px;"></i>');
     return `<span class="crumb${isLast ? ' current-file-crumb' : ''}">${icon ? icon + ' ' : ''}${p}</span>${!isLast ? '<i class="fa-solid fa-chevron-right crumb-separator"></i>' : ''}`;
   }).join('');
+
+  setTimeout(() => {
+    bc.scrollLeft = bc.scrollWidth;
+  }, 10);
 }
 
 // ── Welcome Screen ──────────────────────────────────────────────────────────────

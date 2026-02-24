@@ -442,9 +442,17 @@ body {
   color: var(--text-main);
   border-bottom: 1px solid var(--border-color);
   flex-shrink: 0;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  /* Firefox */
   white-space: nowrap;
   gap: 2px;
+}
+
+.editor-breadcrumb::-webkit-scrollbar {
+  display: none;
+  /* Safari and Chrome */
 }
 
 .crumb-separator {
@@ -459,6 +467,7 @@ body {
   display: flex;
   align-items: center;
   gap: 4px;
+  flex-shrink: 0;
 }
 
 .crumb:hover {
