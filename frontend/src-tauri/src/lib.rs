@@ -1,6 +1,14 @@
 use serde::Serialize;
 use std::fs;
 use std::path::Path;
+use std::sync::Mutex;
+use tauri::{AppHandle, Emitter, Manager};
+use portable_pty::{CommandBuilder, NativePtySystem, PtySize, PtySystem};
+
+struct AppState {
+    pty_pair: Mutex<Option<Box<dyn portable_pty::MasterPty + Send>>>,
+    writer: Mutex<Option<Box<dyn std::io::Write + Send>>>,
+}
 
 #[derive(Serialize)]
 pub struct DirEntry {
@@ -88,6 +96,80 @@ fn move_item(source: String, dest_dir: String) -> Result<String, String> {
     Ok(dest_str)
 }
 
+#[tauri::command]
+fn start_terminal(app: AppHandle) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    if state.pty_pair.lock().unwrap().is_some() {
+        return Ok(());
+    }
+
+    let pty_system = NativePtySystem::default();
+    let pty_pair = pty_system.openpty(PtySize {
+        rows: 24,
+        cols: 80,
+        pixel_width: 0,
+        pixel_height: 0,
+    }).map_err(|e| e.to_string())?;
+
+    #[cfg(target_os = "windows")]
+    let cmd = CommandBuilder::new("powershell.exe");
+    #[cfg(not(target_os = "windows"))]
+    let cmd = CommandBuilder::new({
+        std::env::var("SHELL").unwrap_or_else(|_| "bash".to_string())
+    });
+
+    let mut child = pty_pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;
+    
+    // MasterPty allows cloning reader and writer
+    let mut reader = pty_pair.master.try_clone_reader().map_err(|e| e.to_string())?;
+    let writer = pty_pair.master.take_writer().map_err(|e| e.to_string())?;
+
+    *state.pty_pair.lock().unwrap() = Some(pty_pair.master);
+    *state.writer.lock().unwrap() = Some(writer);
+
+    let app_clone = app.clone();
+    std::thread::spawn(move || {
+        let mut buf = [0u8; 1024];
+        loop {
+            match reader.read(&mut buf) {
+                Ok(n) if n > 0 => {
+                    let text = String::from_utf8_lossy(&buf[..n]).to_string();
+                    let _ = app_clone.emit("terminal-output", text);
+                }
+                _ => break,
+            }
+        }
+    });
+
+    std::thread::spawn(move || {
+        let _ = child.wait();
+    });
+
+    Ok(())
+}
+
+#[tauri::command]
+fn terminal_input(input: String, state: tauri::State<'_, AppState>) -> Result<(), String> {
+    if let Some(writer) = state.writer.lock().unwrap().as_mut() {
+        writer.write_all(input.as_bytes()).map_err(|e| e.to_string())?;
+        writer.flush().map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn resize_terminal(rows: u16, cols: u16, state: tauri::State<'_, AppState>) -> Result<(), String> {
+    if let Some(pty) = state.pty_pair.lock().unwrap().as_mut() {
+        pty.resize(PtySize {
+            rows,
+            cols,
+            pixel_width: 0,
+            pixel_height: 0,
+        }).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -104,8 +186,15 @@ pub fn run() {
             delete_item,
             rename_item,
             move_item,
+            start_terminal,
+            terminal_input,
+            resize_terminal,
         ])
         .setup(|app| {
+            app.manage(AppState {
+                pty_pair: Mutex::new(None),
+                writer: Mutex::new(None),
+            });
             if cfg!(debug_assertions) {
                 app.handle().plugin(
                     tauri_plugin_log::Builder::default()

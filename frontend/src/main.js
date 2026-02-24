@@ -11,6 +11,10 @@ import { open as dialogOpen, ask } from '@tauri-apps/plugin-dialog';
 import { load as loadStore } from '@tauri-apps/plugin-store';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
+import { Terminal } from 'xterm';
+import { FitAddon } from 'xterm-addon-fit';
+import 'xterm/css/xterm.css';
 
 // ── Tauri Detection ────────────────────────────────────────────────────────────
 const IS_TAURI = '__TAURI_INTERNALS__' in window;
@@ -1059,6 +1063,7 @@ const commands = [
   { id: 'toggle-rgb-text',   label: 'Preferences: Toggle RGB Text Effect' },
   { id: 'toggle-zoom',       label: 'Preferences: Toggle 300% Zoom Tracking' },
   { id: 'open-keybindings',  label: 'Preferences: Open Keyboard Shortcuts' },
+  { id: 'toggle-terminal',   label: 'View: Toggle Terminal' }
 ];
 
 let filteredCmds = [], selIdx = 0;
@@ -1161,6 +1166,7 @@ function execCmd(id) {
       if (isZoomEnabled) { document.body.classList.add('zoom-active'); window.updateZoomOrigin(); }
       else { document.body.classList.remove('zoom-active'); view.dom.style.removeProperty('--caret-x'); view.dom.style.removeProperty('--caret-y'); } break;
     case 'open-keybindings': openKeymapSettings(); break;
+    case 'toggle-terminal': toggleTerminal(); break;
   }
 }
 
@@ -1338,7 +1344,90 @@ window.addEventListener('keydown', async e => {
   if (ctrl && alt && k === 'r') { e.preventDefault(); execCmd('toggle-rgb-glow'); return; }
   if (ctrl && alt && k === 't') { e.preventDefault(); execCmd('toggle-rgb-text'); return; }
   if (ctrl && alt && k === 'z') { e.preventDefault(); execCmd('toggle-zoom'); return; }
+  
+  if (ctrl && shift && !alt && e.key === '`') { e.preventDefault(); toggleTerminal(); return; }
 });
+
+// ── Terminal ──────────────────────────────────────────────────────────────────
+let term = null;
+let fitAddon = null;
+let unlistenOutput = null;
+
+async function toggleTerminal() {
+  const panel = document.getElementById('terminal-panel');
+  const resizer = document.getElementById('terminal-resizer');
+  if (panel.style.display === 'none') {
+    panel.style.display = 'flex';
+    resizer.style.display = 'block';
+    
+    if (!term) {
+      term = new Terminal({
+        theme: {
+          background: getComputedStyle(document.body).getPropertyValue('--bg-color').trim() || '#1e1e1e',
+          foreground: '#cccccc',
+          cursor: '#ffffff'
+        },
+        fontFamily: 'monospace',
+        fontSize: 14,
+        cursorBlink: true
+      });
+      fitAddon = new FitAddon();
+      term.loadAddon(fitAddon);
+      term.open(document.getElementById('terminal-body'));
+      
+      // Small delay so DOM settles before fit
+      setTimeout(() => fitAddon.fit(), 30);
+      
+      term.onData(data => {
+        if (IS_TAURI) invoke('terminal_input', { input: data });
+      });
+      term.onResize(size => {
+        if (IS_TAURI) invoke('resize_terminal', { rows: size.rows, cols: size.cols });
+      });
+      
+      if (IS_TAURI) {
+        unlistenOutput = await listen('terminal-output', event => {
+          term.write(event.payload);
+        });
+        await invoke('start_terminal').catch(err => {
+          console.error("Terminal start failed:", err);
+          term.write("\x1b[31mFailed to start terminal: " + err + "\x1b[0m\r\n");
+        });
+      }
+      
+      // Resizer
+      let isDragging = false;
+      resizer.addEventListener('mousedown', () => isDragging = true);
+      document.addEventListener('mousemove', e => {
+        if (!isDragging) return;
+        const totalHeight = document.getElementById('editor-area').clientHeight;
+        const newTerminalHeight = document.getElementById('editor-area').getBoundingClientRect().bottom - e.clientY;
+        if (newTerminalHeight > 100 && newTerminalHeight < totalHeight - 100) {
+          panel.style.height = newTerminalHeight + 'px';
+          fitAddon.fit();
+        }
+      });
+      document.addEventListener('mouseup', () => isDragging = false);
+      window.addEventListener('resize', () => {
+        if (panel.style.display !== 'none') fitAddon.fit();
+      });
+
+      document.getElementById('action-close-terminal').addEventListener('click', () => {
+        panel.style.display = 'none';
+        resizer.style.display = 'none';
+        view.focus();
+      });
+    } else {
+      setTimeout(() => fitAddon.fit(), 30);
+    }
+    
+    setTimeout(() => term.focus(), 50);
+  } else {
+    panel.style.display = 'none';
+    resizer.style.display = 'none';
+    view.focus();
+  }
+}
 
 // ── Init ────────────────────────────────────────────────────────────────────────
 showWelcome(true);

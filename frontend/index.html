@@ -16,15 +16,20 @@
       <div class="menu-item" data-menu="file">
         <span class="menu-label">File</span>
         <div class="menu-dropdown" id="menu-file">
-          <div class="menu-entry" data-action="new-file"><span>New File</span><span class="menu-shortcut">Ctrl+N</span></div>
+          <div class="menu-entry" data-action="new-file"><span>New File</span><span class="menu-shortcut">Ctrl+N</span>
+          </div>
           <div class="menu-entry" data-action="new-folder"><span>New Folder</span></div>
           <div class="menu-separator"></div>
-          <div class="menu-entry" data-action="open-file"><span>Open File...</span><span class="menu-shortcut">Ctrl+O</span></div>
-          <div class="menu-entry" data-action="open-folder"><span>Open Folder...</span><span class="menu-shortcut">Ctrl+K Ctrl+O</span></div>
+          <div class="menu-entry" data-action="open-file"><span>Open File...</span><span
+              class="menu-shortcut">Ctrl+O</span></div>
+          <div class="menu-entry" data-action="open-folder"><span>Open Folder...</span><span
+              class="menu-shortcut">Ctrl+K Ctrl+O</span></div>
           <div class="menu-separator"></div>
-          <div class="menu-entry" data-action="save-file"><span>Save</span><span class="menu-shortcut">Ctrl+S</span></div>
+          <div class="menu-entry" data-action="save-file"><span>Save</span><span class="menu-shortcut">Ctrl+S</span>
+          </div>
           <div class="menu-separator"></div>
-          <div class="menu-entry" data-action="close-editor"><span>Close Editor</span><span class="menu-shortcut">Ctrl+W</span></div>
+          <div class="menu-entry" data-action="close-editor"><span>Close Editor</span><span
+              class="menu-shortcut">Ctrl+W</span></div>
           <div class="menu-separator"></div>
           <div class="menu-entry" data-action="refresh-explorer"><span>Refresh Explorer</span></div>
         </div>
@@ -40,26 +45,34 @@
           <div class="menu-entry" data-action="paste"><span>Paste</span><span class="menu-shortcut">Ctrl+V</span></div>
           <div class="menu-separator"></div>
           <div class="menu-entry" data-action="find"><span>Find</span><span class="menu-shortcut">Ctrl+F</span></div>
-          <div class="menu-entry" data-action="replace"><span>Replace</span><span class="menu-shortcut">Ctrl+H</span></div>
+          <div class="menu-entry" data-action="replace"><span>Replace</span><span class="menu-shortcut">Ctrl+H</span>
+          </div>
         </div>
       </div>
       <div class="menu-item" data-menu="view">
         <span class="menu-label">View</span>
         <div class="menu-dropdown" id="menu-view">
-          <div class="menu-entry" data-action="command-palette"><span>Command Palette</span><span class="menu-shortcut">Ctrl+Shift+P</span></div>
+          <div class="menu-entry" data-action="command-palette"><span>Command Palette</span><span
+              class="menu-shortcut">Ctrl+Shift+P</span></div>
           <div class="menu-separator"></div>
-          <div class="menu-entry" data-action="keyboard-shortcuts"><span>Keyboard Shortcuts</span><span class="menu-shortcut">Ctrl+K Ctrl+S</span></div>
+          <div class="menu-entry" data-action="keyboard-shortcuts"><span>Keyboard Shortcuts</span><span
+              class="menu-shortcut">Ctrl+K Ctrl+S</span></div>
           <div class="menu-separator"></div>
-          <div class="menu-entry" data-action="toggle-glow"><span>Toggle Neon Glow</span><span class="menu-shortcut">Ctrl+Alt+G</span></div>
-          <div class="menu-entry" data-action="toggle-rgb-glow"><span>Toggle RGB Glow</span><span class="menu-shortcut">Ctrl+Alt+R</span></div>
-          <div class="menu-entry" data-action="toggle-rgb-text"><span>Toggle RGB Text</span><span class="menu-shortcut">Ctrl+Alt+T</span></div>
-          <div class="menu-entry" data-action="toggle-zoom"><span>Toggle 300% Zoom</span><span class="menu-shortcut">Ctrl+Alt+Z</span></div>
+          <div class="menu-entry" data-action="toggle-glow"><span>Toggle Neon Glow</span><span
+              class="menu-shortcut">Ctrl+Alt+G</span></div>
+          <div class="menu-entry" data-action="toggle-rgb-glow"><span>Toggle RGB Glow</span><span
+              class="menu-shortcut">Ctrl+Alt+R</span></div>
+          <div class="menu-entry" data-action="toggle-rgb-text"><span>Toggle RGB Text</span><span
+              class="menu-shortcut">Ctrl+Alt+T</span></div>
+          <div class="menu-entry" data-action="toggle-zoom"><span>Toggle 300% Zoom</span><span
+              class="menu-shortcut">Ctrl+Alt+Z</span></div>
         </div>
       </div>
       <div class="menu-item" data-menu="go">
         <span class="menu-label">Go</span>
         <div class="menu-dropdown" id="menu-go">
-          <div class="menu-entry" data-action="go-to-file"><span>Go to File...</span><span class="menu-shortcut">Ctrl+P</span></div>
+          <div class="menu-entry" data-action="go-to-file"><span>Go to File...</span><span
+              class="menu-shortcut">Ctrl+P</span></div>
         </div>
       </div>
     </div>
@@ -98,6 +111,19 @@
         <div class="editor-breadcrumb" id="editor-breadcrumb"></div>
         <div id="editor-welcome"></div>
         <div id="editor-wrap"></div>
+        <!-- Terminal Resizer -->
+        <div id="terminal-resizer" style="height: 4px; cursor: ns-resize; display: none;"></div>
+        <!-- Terminal Panel -->
+        <div id="terminal-panel"
+          style="display: none; flex-direction: column; background: var(--bg-color); border-top: 1px solid var(--border-color);">
+          <div class="terminal-header"
+            style="padding: 4px 16px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color);">
+            <span>Terminal</span>
+            <i class="fa-solid fa-xmark action-icon" id="action-close-terminal" style="cursor: pointer; padding: 4px;"
+              title="Close Terminal"></i>
+          </div>
+          <div id="terminal-body" style="flex: 1; overflow: hidden; position: relative;"></div>
+        </div>
       </div>
     </div>
 
@@ -118,7 +144,8 @@
       <div id="save-dialog">
         <div class="save-dialog-icon"><i class="fa-solid fa-circle-exclamation"></i></div>
         <div class="save-dialog-title">Unsaved Changes</div>
-        <div class="save-dialog-message" id="save-dialog-message">Your changes will be lost if you don't save them.</div>
+        <div class="save-dialog-message" id="save-dialog-message">Your changes will be lost if you don't save them.
+        </div>
         <div class="save-dialog-buttons">
           <button id="save-dialog-save" class="btn-primary">Save</button>
           <button id="save-dialog-dont-save" class="btn-secondary">Don't Save</button>
