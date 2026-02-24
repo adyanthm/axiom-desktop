@@ -97,7 +97,7 @@ fn move_item(source: String, dest_dir: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-fn start_terminal(app: AppHandle) -> Result<(), String> {
+fn start_terminal(app: AppHandle, cwd: Option<String>) -> Result<(), String> {
     let state = app.state::<AppState>();
     if state.pty_pair.lock().unwrap().is_some() {
         return Ok(());
@@ -112,11 +112,15 @@ fn start_terminal(app: AppHandle) -> Result<(), String> {
     }).map_err(|e| e.to_string())?;
 
     #[cfg(target_os = "windows")]
-    let cmd = CommandBuilder::new("powershell.exe");
+    let mut cmd = CommandBuilder::new("powershell.exe");
     #[cfg(not(target_os = "windows"))]
-    let cmd = CommandBuilder::new({
+    let mut cmd = CommandBuilder::new({
         std::env::var("SHELL").unwrap_or_else(|_| "bash".to_string())
     });
+
+    if let Some(dir) = cwd {
+        cmd.cwd(Path::new(&dir));
+    }
 
     let mut child = pty_pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;
     

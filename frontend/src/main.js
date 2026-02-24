@@ -1052,18 +1052,18 @@ const commandInput   = document.getElementById('command-input');
 const paletteList    = document.getElementById('palette-list');
 
 const commands = [
+  { id: 'toggle-terminal',   label: 'View: Toggle Terminal' },
+  { id: 'toggle-zoom',       label: 'Preferences: Toggle 300% Zoom Tracking' },
+  { id: 'toggle-rgb-text',   label: 'Preferences: Toggle RGB Text Effect' },
+  { id: 'toggle-glow',       label: 'Preferences: Toggle Neon Glow Effect' },
+  { id: 'toggle-rgb-glow',   label: 'Preferences: Toggle RGB Moving Glow Effect' },
+  { id: 'open-keybindings',  label: 'Preferences: Open Keyboard Shortcuts' },
+  { id: 'close-editor',      label: 'View: Close Editor' },
   { id: 'open-folder',       label: 'File: Open Folder...' },
   { id: 'open-file',         label: 'File: Open File...' },
   { id: 'new-file',          label: 'File: New File' },
   { id: 'new-folder',        label: 'File: New Folder' },
-  { id: 'save-file',         label: 'File: Save' },
-  { id: 'close-editor',      label: 'View: Close Editor' },
-  { id: 'toggle-glow',       label: 'Preferences: Toggle Neon Glow Effect' },
-  { id: 'toggle-rgb-glow',   label: 'Preferences: Toggle RGB Moving Glow Effect' },
-  { id: 'toggle-rgb-text',   label: 'Preferences: Toggle RGB Text Effect' },
-  { id: 'toggle-zoom',       label: 'Preferences: Toggle 300% Zoom Tracking' },
-  { id: 'open-keybindings',  label: 'Preferences: Open Keyboard Shortcuts' },
-  { id: 'toggle-terminal',   label: 'View: Toggle Terminal' }
+  { id: 'save-file',         label: 'File: Save' }
 ];
 
 let filteredCmds = [], selIdx = 0;
@@ -1345,7 +1345,7 @@ window.addEventListener('keydown', async e => {
   if (ctrl && alt && k === 't') { e.preventDefault(); execCmd('toggle-rgb-text'); return; }
   if (ctrl && alt && k === 'z') { e.preventDefault(); execCmd('toggle-zoom'); return; }
   
-  if (ctrl && shift && !alt && e.key === '`') { e.preventDefault(); toggleTerminal(); return; }
+  if (ctrl && shift && !alt && (e.key === '`' || e.key === '~' || e.code === 'Backquote')) { e.preventDefault(); toggleTerminal(); return; }
 });
 
 // ── Terminal ──────────────────────────────────────────────────────────────────
@@ -1389,7 +1389,7 @@ async function toggleTerminal() {
         unlistenOutput = await listen('terminal-output', event => {
           term.write(event.payload);
         });
-        await invoke('start_terminal').catch(err => {
+        await invoke('start_terminal', { cwd: rootDirPath || null }).catch(err => {
           console.error("Terminal start failed:", err);
           term.write("\x1b[31mFailed to start terminal: " + err + "\x1b[0m\r\n");
         });
