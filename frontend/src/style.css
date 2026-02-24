@@ -36,6 +36,28 @@ body {
   user-select: none;
 }
 
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-main);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--bg-active);
+  border: 1px solid var(--bg-sidebar);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--context-border);
+}
+
+::-webkit-scrollbar-corner {
+  background: var(--bg-main);
+}
+
 #app {
   display: flex;
   flex-direction: column;

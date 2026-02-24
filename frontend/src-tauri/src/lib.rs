@@ -20,11 +20,16 @@ pub struct DirEntry {
 
 #[tauri::command]
 fn read_file_text(path: String) -> Result<String, String> {
-    let bytes = fs::read(&path).map_err(|e| format!("Failed to read {}: {}", path, e))?;
-    // Try UTF-8 first, fall back to lossy conversion for ANSI/Windows-1252 encoded files
-    match String::from_utf8(bytes.clone()) {
+    match fs::read_to_string(&path) {
         Ok(s) => Ok(s),
-        Err(_) => Ok(String::from_utf8_lossy(&bytes).to_string()),
+        Err(e) => {
+            if e.kind() == std::io::ErrorKind::InvalidData {
+                let bytes = fs::read(&path).map_err(|e| format!("Failed to read {}: {}", path, e))?;
+                Ok(String::from_utf8_lossy(&bytes).into_owned())
+            } else {
+                Err(format!("Failed to read {}: {}", path, e))
+            }
+        }
     }
 }
 
@@ -133,7 +138,7 @@ fn start_terminal(app: AppHandle, cwd: Option<String>) -> Result<(), String> {
 
     let app_clone = app.clone();
     std::thread::spawn(move || {
-        let mut buf = [0u8; 1024];
+        let mut buf = [0u8; 8192];
         loop {
             match reader.read(&mut buf) {
                 Ok(n) if n > 0 => {

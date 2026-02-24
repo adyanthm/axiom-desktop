@@ -701,6 +701,7 @@ async function closeTab(filePath) {
   }
   openTabs = openTabs.filter(f => f !== filePath);
   fileEditorStates.delete(filePath);
+  fileContents.delete(filePath); // FIX: aggressively purge memory cache of raw text
   if (filePath === currentFile) {
     if (openTabs.length > 0) {
       await openFile(openTabs[openTabs.length - 1]);
@@ -1122,13 +1123,16 @@ const commands = [
 ];
 
 let filteredCmds = [], selIdx = 0;
+let paletteFileCache = null;
 
 function togglePalette(forceClose = false, mode = 'command') {
   if (forceClose || commandOverlay.classList.contains('active')) {
     commandOverlay.classList.remove('active');
     view.focus();
+    paletteFileCache = null;
   } else {
     commandOverlay.classList.add('active');
+    paletteFileCache = null;
     commandInput.value = mode === 'command' ? '>' : '';
     renderPalette(commandInput.value);
     setTimeout(() => commandInput.focus(), 50);
@@ -1148,10 +1152,13 @@ function renderPalette(q) {
     filteredCmds = commands.filter(c => c.label.toLowerCase().includes(s));
   } else {
     const s = q.toLowerCase();
-    const allFiles = fileTree ? getAllFilePaths(fileTree.children) : [];
-    const relPaths = allFiles.map(f => ({ full: f, rel: getRelativePath(f), base: pathBasename(f) }));
-    filteredCmds = relPaths
+    if (!paletteFileCache) {
+      const allFiles = fileTree ? getAllFilePaths(fileTree.children) : [];
+      paletteFileCache = allFiles.map(f => ({ full: f, rel: getRelativePath(f), base: pathBasename(f) }));
+    }
+    filteredCmds = paletteFileCache
       .filter(f => f.base.toLowerCase().includes(s) || f.rel.toLowerCase().includes(s))
+      .slice(0, 100)
       .map(f => ({ id: 'open-file:' + f.full, label: f.base, sublabel: f.rel, isFile: true }));
   }
   selIdx = 0;
