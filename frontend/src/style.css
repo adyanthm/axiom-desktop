@@ -322,6 +322,35 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex: 1;
+}
+
+/* ── Selection state (shared by files and dirs) ── */
+.file-item.selected,
+.dir-item.selected {
+  background: rgba(82, 139, 255, 0.15);
+  color: var(--text-active);
+}
+
+.file-item.selected.active {
+  background: rgba(82, 139, 255, 0.25);
+}
+
+/* ── Drag and Drop ── */
+.dir-item.drop-target {
+  background: rgba(82, 139, 255, 0.25);
+  outline: 1px solid var(--accent-color);
+  outline-offset: -1px;
+  border-radius: 2px;
+}
+
+.file-item.dragging,
+.dir-item.dragging {
+  opacity: 0.4;
+}
+
+.dir-item {
+  outline: none;
 }
 
 /* ── Dirty dot in explorer ── */
@@ -447,29 +476,175 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 16px;
+  gap: 24px;
   color: var(--text-muted);
   user-select: none;
+  overflow-y: auto;
+  padding: 40px 20px;
 }
 
 #editor-welcome p {
   font-size: 14px;
 }
 
-#welcome-open-btn {
-  background: var(--accent-color);
-  color: #fff;
-  border: none;
-  padding: 8px 20px;
-  border-radius: 6px;
-  font-size: 13px;
-  cursor: pointer;
-  font-family: inherit;
-  transition: opacity .15s;
+.welcome-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
 }
 
-#welcome-open-btn:hover {
-  opacity: .85;
+.welcome-logo {
+  font-size: 48px;
+  line-height: 1;
+  filter: drop-shadow(0 0 12px rgba(82, 139, 255, .4));
+}
+
+.welcome-title {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text-active);
+  letter-spacing: -0.5px;
+}
+
+.welcome-subtitle {
+  font-size: 14px;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.welcome-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 320px;
+  max-width: 100%;
+}
+
+.welcome-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 16px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-active);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+}
+
+.welcome-action-btn:hover {
+  background: var(--bg-active);
+  border-color: var(--accent-color);
+}
+
+.welcome-action-btn i {
+  font-size: 15px;
+  width: 20px;
+  text-align: center;
+  color: var(--accent-color);
+}
+
+.welcome-shortcut {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+}
+
+.welcome-section {
+  width: 320px;
+  max-width: 100%;
+  margin-top: 8px;
+}
+
+.welcome-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  margin-bottom: 8px;
+  padding-left: 4px;
+}
+
+.recent-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.recent-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background .12s;
+}
+
+.recent-item:hover {
+  background: var(--bg-hover);
+}
+
+.recent-item i {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.recent-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.recent-name {
+  font-size: 13px;
+  color: var(--text-active);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recent-path {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recent-remove {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  font-size: 11px;
+  opacity: 0;
+  transition: opacity .12s;
+  flex-shrink: 0;
+}
+
+.recent-item:hover .recent-remove {
+  opacity: 1;
+}
+
+.recent-remove:hover {
+  background: var(--bg-active);
+  color: var(--text-active);
 }
 
 /* ── Tabs ── */
@@ -1015,6 +1190,18 @@ body.zoom-active .cm-editor {
 .palette-item:hover {
   background: var(--context-hover);
   color: var(--accent-text);
+}
+
+.palette-path {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-muted);
+  padding-left: 16px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 50%;
+  text-align: right;
 }
 
 /* ── Keymap Panel ── */

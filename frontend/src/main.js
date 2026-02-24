@@ -6,39 +6,84 @@ import { python } from '@codemirror/lang-python';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { autocompletion } from '@codemirror/autocomplete';
 import { searchKeymap, search } from '@codemirror/search';
+// File operations are handled by custom Rust commands via invoke (no fs plugin scope issues)
+import { open as dialogOpen, ask } from '@tauri-apps/plugin-dialog';
+import { load as loadStore } from '@tauri-apps/plugin-store';
+import { getCurrentWindow } from '@tauri-apps/api/window';
+import { invoke } from '@tauri-apps/api/core';
+
+// ── Tauri Detection ────────────────────────────────────────────────────────────
+const IS_TAURI = '__TAURI_INTERNALS__' in window;
+
+// ── Store (persistent settings) ────────────────────────────────────────────────
+let store = null;
+async function getStore() {
+  if (store) return store;
+  if (!IS_TAURI) return null;
+  store = await loadStore('axiom-settings.json');
+  return store;
+}
+
+async function getRecentProjects() {
+  const s = await getStore();
+  if (!s) return [];
+  return (await s.get('recentProjects')) || [];
+}
+
+async function addRecentProject(folderPath, folderName) {
+  const s = await getStore();
+  if (!s) return;
+  let recents = (await s.get('recentProjects')) || [];
+  recents = recents.filter(r => r.path !== folderPath);
+  recents.unshift({ path: folderPath, name: folderName, lastOpened: Date.now() });
+  if (recents.length > 10) recents = recents.slice(0, 10);
+  await s.set('recentProjects', recents);
+  await s.save();
+}
+
+async function removeRecentProject(folderPath) {
+  const s = await getStore();
+  if (!s) return;
+  let recents = (await s.get('recentProjects')) || [];
+  recents = recents.filter(r => r.path !== folderPath);
+  await s.set('recentProjects', recents);
+  await s.save();
+}
 
 // ── File System State ──────────────────────────────────────────────────────────
-let rootDirHandle = null;
+let rootDirPath = null;
 let rootName = 'AXIOM_PROJECT';
-const fileHandles = new Map();      // path → FileSystemFileHandle
-const dirHandles  = new Map();      // path → FileSystemDirectoryHandle
-const fileContents = new Map();     // path → string (last-saved content)
-const fileEditorStates = new Map(); // path → EditorState
-const dirtyFiles = new Set();       // paths of unsaved files
-let fileTree = null;                // tree root node
-let expandedDirs = new Set();       // expanded folder paths
-let usingMemory = true;             // true when no real folder is open
-
-// In-memory fallback
-const memFiles = {};
-// Seed fileContents with all memory files so dirty tracking works
-Object.entries(memFiles).forEach(([k, v]) => fileContents.set(k, v));
+const fileContents = new Map();
+const fileEditorStates = new Map();
+const dirtyFiles = new Set();
+let fileTree = null;
+let expandedDirs = new Set();
 
 let openTabs = [];
 let currentFile = null;
 
-// Context state
 let activeContextPath = null;
 let activeContextIsDir = false;
 
-// Inline creator state  { parentPath, type }
 let inlineCreator = null;
 
+// ── Explorer Selection & Drag State ────────────────────────────────────────────
+let selectedPaths = new Set();
+let lastClickedPath = null;
+let flatVisiblePaths = [];
+let draggedPaths = null;
+
 // ── CodeMirror Effects Flags ───────────────────────────────────────────────────
-let isZoomEnabled    = false;
-let isGlowEnabled    = false;
+let isZoomEnabled = false;
+let isGlowEnabled = false;
 let isRgbGlowEnabled = false;
 let isRgbTextEnabled = false;
+
+// ── Path Helpers ───────────────────────────────────────────────────────────────
+const SEP = navigator.platform.startsWith('Win') ? '\\' : '/';
+function pathJoin(...parts) { return parts.filter(Boolean).join(SEP); }
+function pathBasename(p) { return p.split(/[\\/]/).pop(); }
+function pathDirname(p) { const i = Math.max(p.lastIndexOf('/'), p.lastIndexOf('\\')); return i < 0 ? '' : p.substring(0, i); }
 
 // ── Editor Factory ─────────────────────────────────────────────────────────────
 function createEditorState(content) {
@@ -91,68 +136,78 @@ function getFileIcon(name) {
   if (name.endsWith('.py'))   return '<i class="fa-brands fa-python" style="color:#4B8BBE;"></i>';
   if (name.endsWith('.json')) return '<i class="fa-solid fa-code" style="color:#e06c75;"></i>';
   if (name.endsWith('.js'))   return '<i class="fa-brands fa-js" style="color:#F7DF1E;"></i>';
+  if (name.endsWith('.ts'))   return '<i class="fa-brands fa-js" style="color:#3178C6;"></i>';
   if (name.endsWith('.css'))  return '<i class="fa-brands fa-css3-alt" style="color:#1572B6;"></i>';
   if (name.endsWith('.html')) return '<i class="fa-brands fa-html5" style="color:#E34F26;"></i>';
   if (name.endsWith('.md'))   return '<i class="fa-solid fa-file-lines" style="color:#6699CC;"></i>';
   if (name.endsWith('.txt'))  return '<i class="fa-solid fa-file-lines" style="color:#888;"></i>';
+  if (name.endsWith('.rs'))   return '<i class="fa-solid fa-gear" style="color:#DEA584;"></i>';
+  if (name.endsWith('.toml')) return '<i class="fa-solid fa-file-code" style="color:#9c4221;"></i>';
   return '<i class="fa-solid fa-file" style="color:#888;"></i>';
 }
 
-// CSS-escape a path for querySelector
-function esc(str) {
-  return CSS.escape ? CSS.escape(str) : str.replace(/[!"#$%&'()*+,.\/:;<=>?@[\\\]^`{|}~]/g, '\\$&');
+function esc(str) { return CSS.escape(str); }
+
+// ── Window Title ───────────────────────────────────────────────────────────────
+async function updateWindowTitle() {
+  if (!IS_TAURI) return;
+  const win = getCurrentWindow();
+  let title = 'Axiom IDE';
+  if (rootName && rootDirPath) title = `${currentFile ? pathBasename(currentFile) + ' - ' : ''}${rootName} - Axiom IDE`;
+  else if (currentFile) title = `${pathBasename(currentFile)} - Axiom IDE`;
+  await win.setTitle(title);
 }
 
-// ── Open Folder (File System Access API) ──────────────────────────────────────
-async function openFolder() {
-  if (!('showDirectoryPicker' in window)) {
-    alert('Your browser does not support the File System Access API.\nPlease use Chrome or Edge 86+.');
-    return;
-  }
-  try {
-    const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
-    rootDirHandle = handle;
-    rootName = handle.name;
-
-    // Clear state
-    fileHandles.clear(); dirHandles.clear();
-    fileContents.clear(); fileEditorStates.clear();
-    dirtyFiles.clear(); expandedDirs.clear();
-    openTabs = []; currentFile = null;
-    usingMemory = false;
-
-    dirHandles.set('', handle);
-
-    const children = await scanDir(handle, '');
-    fileTree = { name: rootName, path: '', type: 'directory', children };
-
-    document.getElementById('sidebar-folder-name').textContent = rootName.toUpperCase();
-    showWelcome(false);
-    renderExplorer();
-    renderTabs();
-
-    // Auto-open first .py
-    const first = findFirstFile(children, '.py');
-    if (first) openFile(first);
-  } catch (e) {
-    if (e.name !== 'AbortError') console.error('Open folder failed:', e);
-  }
-}
-
-async function scanDir(dirHandle, parentPath) {
-  const children = [];
-  for await (const [name, handle] of dirHandle.entries()) {
-    if (name.startsWith('.') || name === 'node_modules' || name === '__pycache__') continue;
-    const fullPath = parentPath ? `${parentPath}/${name}` : name;
-    if (handle.kind === 'file') {
-      fileHandles.set(fullPath, handle);
-      children.push({ name, path: fullPath, type: 'file' });
-    } else {
-      dirHandles.set(fullPath, handle);
-      const sub = await scanDir(handle, fullPath);
-      children.push({ name, path: fullPath, type: 'directory', children: sub });
+// ── Open Folder (Tauri native) ─────────────────────────────────────────────────
+async function openFolder(folderPath) {
+  let dirPath = folderPath;
+  if (!dirPath) {
+    if (!IS_TAURI) {
+      alert('Desktop features require the Tauri runtime.');
+      return;
     }
+    dirPath = await dialogOpen({ directory: true, multiple: false, title: 'Open Folder' });
+    if (!dirPath) return;
   }
+
+  rootDirPath = dirPath;
+  rootName = pathBasename(dirPath);
+
+  fileContents.clear();
+  fileEditorStates.clear();
+  dirtyFiles.clear();
+  expandedDirs.clear();
+  openTabs = [];
+  currentFile = null;
+
+  const children = await scanDir(dirPath);
+  fileTree = { name: rootName, path: dirPath, type: 'directory', children };
+
+  document.getElementById('sidebar-folder-name').textContent = rootName.toUpperCase();
+  showWelcome(false);
+  renderExplorer();
+  renderTabs();
+  updateWindowTitle();
+  await addRecentProject(dirPath, rootName);
+
+  const first = findFirstFile(children, '.py') || findFirstFile(children, '.js') || findFirstFile(children, '.rs');
+  if (first) openFile(first);
+}
+
+async function scanDir(dirPath) {
+  const children = [];
+  try {
+    const entries = await invoke('list_dir', { path: dirPath });
+    for (const entry of entries) {
+      if (entry.name.startsWith('.') || entry.name === 'node_modules' || entry.name === '__pycache__' || entry.name === 'target') continue;
+      if (entry.is_directory) {
+        const sub = await scanDir(entry.path);
+        children.push({ name: entry.name, path: entry.path, type: 'directory', children: sub });
+      } else {
+        children.push({ name: entry.name, path: entry.path, type: 'file' });
+      }
+    }
+  } catch (e) { console.error('scanDir failed:', dirPath, e); }
   children.sort((a, b) => {
     if (a.type !== b.type) return a.type === 'directory' ? -1 : 1;
     return a.name.localeCompare(b.name);
@@ -172,11 +227,9 @@ function findFirstFile(nodes, ext) {
 }
 
 async function refreshTree() {
-  if (usingMemory || !rootDirHandle) { renderExplorer(); return; }
-  fileHandles.clear();
-  dirHandles.set('', rootDirHandle);
-  const children = await scanDir(rootDirHandle, '');
-  fileTree = { name: rootName, path: '', type: 'directory', children };
+  if (!rootDirPath) { renderExplorer(); return; }
+  const children = await scanDir(rootDirPath);
+  fileTree = { name: rootName, path: rootDirPath, type: 'directory', children };
   renderExplorer();
 }
 
@@ -185,93 +238,261 @@ function renderExplorer() {
   const el = document.getElementById('file-explorer');
   if (!el) return;
   el.innerHTML = '';
+  flatVisiblePaths = [];
 
-  if (usingMemory) {
+  if (!rootDirPath) {
     const welcome = document.createElement('div');
     welcome.className = 'explorer-welcome';
-    welcome.innerHTML = `
-      <p>No folder open</p>
-      <button id="explorer-open-btn">Open Folder</button>
-    `;
+    welcome.innerHTML = `<p>No folder open</p><button id="explorer-open-btn">Open Folder</button>`;
     welcome.querySelector('#explorer-open-btn').addEventListener('click', () => openFolder());
     el.appendChild(welcome);
-    
-    // Hide/disable explorer toolbar actions
     document.querySelector('.title-actions').style.display = 'none';
     return;
   }
-  
-  // Show toolbar actions when a folder is open
-  document.querySelector('.title-actions').style.display = 'flex';
 
+  document.querySelector('.title-actions').style.display = 'flex';
   if (!fileTree) return;
-  renderNodes(fileTree.children, el, 0, '');
+  renderNodes(fileTree.children, el, 0, fileTree.path);
+
+  // Click on empty explorer space → deselect all
+  el.addEventListener('click', e => {
+    if (e.target === el) { selectedPaths.clear(); updateSelectionUI(); }
+  });
+
+  // ── Delegated drag-drop on the whole explorer container ──
+  el.addEventListener('dragover', e => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    // Find the nearest dir-item under cursor and highlight it
+    document.querySelectorAll('.drop-target').forEach(x => x.classList.remove('drop-target'));
+    const target = e.target.closest('.dir-item');
+    if (target) target.classList.add('drop-target');
+  });
+
+  el.addEventListener('dragleave', e => {
+    // Only clear if leaving the explorer entirely
+    if (!el.contains(e.relatedTarget)) {
+      document.querySelectorAll('.drop-target').forEach(x => x.classList.remove('drop-target'));
+    }
+  });
+
+  el.addEventListener('drop', async e => {
+    e.preventDefault();
+    document.querySelectorAll('.drop-target').forEach(x => x.classList.remove('drop-target'));
+    // Find which directory to drop into
+    const dirEl = e.target.closest('.dir-item');
+    const fileEl = e.target.closest('.file-item');
+    let destDir;
+    if (dirEl) {
+      destDir = dirEl.dataset.path;
+    } else if (fileEl) {
+      destDir = pathDirname(fileEl.dataset.path || fileEl.dataset.file);
+    } else {
+      destDir = rootDirPath;
+    }
+    if (destDir) await handleDrop(destDir);
+  });
 }
 
 function renderNodes(nodes, container, depth, parentPath) {
-  // Inline creator for this dir level
   if (inlineCreator && inlineCreator.parentPath === parentPath) {
     container.appendChild(buildInlineCreatorEl(depth, parentPath));
   }
   if (!nodes) return;
   nodes.forEach(node => {
-    if (node.type === 'directory') {
-      const expanded = expandedDirs.has(node.path);
-      const dir = document.createElement('div');
-      dir.className = 'dir-item';
-      dir.dataset.path = node.path;
-      dir.style.paddingLeft = (6 + depth * 12) + 'px';
-      dir.innerHTML = `
-        <i class="fa-solid ${expanded ? 'fa-chevron-down' : 'fa-chevron-right'} dir-chevron"></i>
-        <i class="fa-solid ${expanded ? 'fa-folder-open' : 'fa-folder'} dir-icon"></i>
-        <span class="dir-name">${node.name}</span>`;
-
-      dir.addEventListener('click', e => { e.stopPropagation(); toggleDir(node.path); });
-      dir.addEventListener('contextmenu', e => {
-        e.preventDefault(); e.stopPropagation();
-        activeContextPath = node.path; activeContextIsDir = true;
-        showCtxMenu(e.pageX, e.pageY);
-      });
-      container.appendChild(dir);
-
-      if (expanded) renderNodes(node.children, container, depth + 1, node.path);
-    } else {
-      container.appendChild(buildFileEl(node.path, node.name, depth));
+    const isDir = node.type === 'directory';
+    flatVisiblePaths.push({ path: node.path, isDir });
+    const el = buildExplorerItem(node, depth);
+    container.appendChild(el);
+    if (isDir && expandedDirs.has(node.path)) {
+      renderNodes(node.children, container, depth + 1, node.path);
     }
   });
 }
 
-function buildFileEl(filePath, fileName, depth) {
-  const dirty = dirtyFiles.has(filePath);
+function buildExplorerItem(node, depth) {
+  const isDir = node.type === 'directory';
+  const expanded = isDir && expandedDirs.has(node.path);
+  const dirty = !isDir && dirtyFiles.has(node.path);
+  const selected = selectedPaths.has(node.path);
+
   const div = document.createElement('div');
-  div.className = 'file-item' + (filePath === currentFile ? ' active' : '');
-  div.dataset.file = filePath;
+  div.className = (isDir ? 'dir-item' : 'file-item')
+    + (selected ? ' selected' : '')
+    + (!isDir && node.path === currentFile ? ' active' : '');
+  div.dataset.path = node.path;
+  if (!isDir) div.dataset.file = node.path;
   div.tabIndex = 0;
-  div.style.paddingLeft = (6 + depth * 12 + (usingMemory ? 0 : 16)) + 'px';
-  div.innerHTML = `${getFileIcon(fileName)}<span class="file-name">${fileName}</span>${dirty ? '<span class="explorer-dot">●</span>' : ''}`;
-  div.addEventListener('click', () => openFile(filePath));
-  div.addEventListener('keydown', e => { if (e.key === 'Delete') { e.preventDefault(); deleteItem(filePath, false); }});
+  div.style.paddingLeft = (6 + depth * 12 + (isDir ? 0 : 16)) + 'px';
+
+  if (isDir) {
+    div.innerHTML = `
+      <i class="fa-solid ${expanded ? 'fa-chevron-down' : 'fa-chevron-right'} dir-chevron"></i>
+      <i class="fa-solid ${expanded ? 'fa-folder-open' : 'fa-folder'} dir-icon"></i>
+      <span class="dir-name">${node.name}</span>`;
+  } else {
+    div.innerHTML = `${getFileIcon(node.name)}<span class="file-name">${node.name}</span>${dirty ? '<span class="explorer-dot">●</span>' : ''}`;
+  }
+
+  // Click handler: selection + navigation
+  div.addEventListener('click', e => {
+    e.stopPropagation();
+    div.focus();
+    handleExplorerClick(node.path, isDir, e);
+  });
+
+  // Double click on file opens it (single click selects + opens in VS Code style)
+  if (!isDir) {
+    div.addEventListener('dblclick', e => { e.stopPropagation(); openFile(node.path); });
+  }
+
+  // Keyboard: Del key
+  div.addEventListener('keydown', e => {
+    if (e.key === 'Delete') {
+      e.preventDefault();
+      if (selectedPaths.size > 0) deleteSelected();
+      else deleteItem(node.path, isDir);
+    }
+  });
+
+  // Context menu
   div.addEventListener('contextmenu', e => {
     e.preventDefault(); e.stopPropagation();
-    activeContextPath = filePath; activeContextIsDir = false;
+    // If right-clicked item not in selection, select just it
+    if (!selectedPaths.has(node.path)) {
+      selectedPaths.clear();
+      selectedPaths.add(node.path);
+      lastClickedPath = node.path;
+      updateSelectionUI();
+    }
+    activeContextPath = node.path; activeContextIsDir = isDir;
     showCtxMenu(e.pageX, e.pageY);
   });
+
+  // Drag: make draggable
+  div.draggable = true;
+  div.addEventListener('dragstart', e => {
+    e.stopPropagation();
+    if (!selectedPaths.has(node.path)) {
+      selectedPaths.clear();
+      selectedPaths.add(node.path);
+      updateSelectionUI();
+    }
+    draggedPaths = [...selectedPaths];
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', JSON.stringify(draggedPaths));
+    div.classList.add('dragging');
+  });
+  div.addEventListener('dragend', () => {
+    div.classList.remove('dragging');
+    document.querySelectorAll('.drop-target').forEach(x => x.classList.remove('drop-target'));
+    draggedPaths = null;
+  });
+
   return div;
+}
+
+function handleExplorerClick(path, isDir, e) {
+  if (e.ctrlKey || e.metaKey) {
+    // Toggle item in selection
+    if (selectedPaths.has(path)) selectedPaths.delete(path);
+    else selectedPaths.add(path);
+    lastClickedPath = path;
+  } else if (e.shiftKey && lastClickedPath) {
+    // Range select
+    const idx1 = flatVisiblePaths.findIndex(p => p.path === lastClickedPath);
+    const idx2 = flatVisiblePaths.findIndex(p => p.path === path);
+    if (idx1 >= 0 && idx2 >= 0) {
+      const [start, end] = idx1 < idx2 ? [idx1, idx2] : [idx2, idx1];
+      for (let i = start; i <= end; i++) {
+        selectedPaths.add(flatVisiblePaths[i].path);
+      }
+    }
+  } else {
+    // Single click: select this item only
+    selectedPaths.clear();
+    selectedPaths.add(path);
+    lastClickedPath = path;
+    // For files, open in editor but keep explorer focus (VS Code behavior)
+    if (!isDir) openFile(path, false);
+    // For dirs, toggle expand/collapse
+    if (isDir) toggleDir(path);
+  }
+  updateSelectionUI();
+}
+
+function updateSelectionUI() {
+  document.querySelectorAll('.file-item, .dir-item').forEach(el => {
+    const path = el.dataset.path || el.dataset.file;
+    el.classList.toggle('selected', selectedPaths.has(path));
+  });
+}
+
+async function handleDrop(destDir) {
+  if (!draggedPaths || draggedPaths.length === 0) return;
+  // Don't drop into self or a child of self
+  const invalid = draggedPaths.some(p => destDir === p || destDir.startsWith(p + SEP));
+  if (invalid) return;
+  for (const src of draggedPaths) {
+    try {
+      await invoke('move_item', { source: src, destDir });
+      // Clean up if moved file was open
+      const newPath = pathJoin(destDir, pathBasename(src));
+      const tabIdx = openTabs.indexOf(src);
+      if (tabIdx !== -1) openTabs[tabIdx] = newPath;
+      if (currentFile === src) currentFile = newPath;
+      const state = fileEditorStates.get(src);
+      if (state) { fileEditorStates.set(newPath, state); fileEditorStates.delete(src); }
+      const content = fileContents.get(src);
+      if (content !== undefined) { fileContents.set(newPath, content); fileContents.delete(src); }
+      if (dirtyFiles.has(src)) { dirtyFiles.add(newPath); dirtyFiles.delete(src); }
+    } catch (e) { console.error('Move failed:', src, e); }
+  }
+  selectedPaths.clear();
+  draggedPaths = null;
+  await refreshTree();
+  renderTabs();
+  if (currentFile) { updateBreadcrumb(currentFile); updateWindowTitle(); }
+}
+
+async function deleteSelected() {
+  if (selectedPaths.size === 0) return;
+  const count = selectedPaths.size;
+  const label = count === 1 ? `"${pathBasename([...selectedPaths][0])}"` : `${count} items`;
+  const confirmed = await ask(`Delete ${label}? This cannot be undone.`, {
+    title: 'Confirm Delete', kind: 'warning', okLabel: 'Delete', cancelLabel: 'Cancel'
+  });
+  if (!confirmed) return;
+  for (const path of [...selectedPaths]) {
+    const isDir = flatVisiblePaths.find(p => p.path === path)?.isDir ?? false;
+    try {
+      await invoke('delete_item', { path, recursive: isDir });
+      fileContents.delete(path); dirtyFiles.delete(path);
+      if (openTabs.includes(path)) {
+        openTabs = openTabs.filter(f => f !== path);
+        fileEditorStates.delete(path);
+      }
+    } catch (e) { console.error('Delete failed:', path, e); }
+  }
+  if (currentFile && selectedPaths.has(currentFile)) {
+    if (openTabs.length > 0) await openFile(openTabs[openTabs.length - 1]);
+    else { currentFile = null; showWelcome(true); renderTabs(); updateWindowTitle(); }
+  }
+  selectedPaths.clear();
+  await refreshTree();
+  renderTabs();
 }
 
 function buildInlineCreatorEl(depth, parentPath) {
   const wrap = document.createElement('div');
   wrap.className = 'inline-creator';
-  const extraIndent = usingMemory ? 0 : 16;
-  wrap.style.paddingLeft = (6 + depth * 12 + extraIndent) + 'px';
+  wrap.style.paddingLeft = (6 + depth * 12 + 16) + 'px';
   const iconHtml = inlineCreator.type === 'file'
     ? '<i class="fa-solid fa-file" style="color:#888;"></i>'
     : '<i class="fa-solid fa-folder" style="color:#E8AB4F;"></i>';
   wrap.innerHTML = `${iconHtml}<input type="text" class="inline-input" placeholder="${inlineCreator.type === 'file' ? 'filename.py' : 'folder'}" autocomplete="off" spellcheck="false"/>`;
-
   const input = wrap.querySelector('.inline-input');
   setTimeout(() => { input.focus(); input.select(); }, 30);
-
   const commit = async () => {
     const name = input.value.trim();
     if (name) {
@@ -281,7 +502,6 @@ function buildInlineCreatorEl(depth, parentPath) {
     inlineCreator = null;
     await refreshTree();
   };
-
   input.addEventListener('keydown', async e => {
     if (e.key === 'Enter') { e.preventDefault(); await commit(); }
     else if (e.key === 'Escape') { e.preventDefault(); inlineCreator = null; renderExplorer(); }
@@ -304,7 +524,7 @@ function renderTabs() {
   if (!c) return;
   c.innerHTML = '';
   openTabs.forEach(fp => {
-    const fn = fp.split('/').pop();
+    const fn = pathBasename(fp);
     const dirty = dirtyFiles.has(fp);
     const div = document.createElement('div');
     div.className = 'tab' + (fp === currentFile ? ' active' : '');
@@ -330,30 +550,20 @@ function patchExplorerDirty(fp) {
   let dot = el.querySelector('.explorer-dot');
   if (dirtyFiles.has(fp)) {
     if (!dot) { dot = document.createElement('span'); dot.className = 'explorer-dot'; dot.textContent = '●'; el.appendChild(dot); }
-  } else {
-    dot?.remove();
-  }
+  } else { dot?.remove(); }
 }
 
 // ── Open / Close File ──────────────────────────────────────────────────────────
-async function openFile(filePath) {
+async function openFile(filePath, focusEditor = true) {
   if (!filePath) return;
   if (currentFile) fileEditorStates.set(currentFile, view.state);
 
   if (!fileEditorStates.has(filePath)) {
     let content = '';
-    if (usingMemory) {
-      content = memFiles[filePath] ?? '';
+    try {
+      content = await invoke('read_file_text', { path: filePath });
       fileContents.set(filePath, content);
-    } else {
-      const handle = fileHandles.get(filePath);
-      if (!handle) return;
-      try {
-        const f = await handle.getFile();
-        content = await f.text();
-        fileContents.set(filePath, content);
-      } catch (e) { console.error('Read failed:', e); return; }
-    }
+    } catch (e) { console.error('Read failed:', e); return; }
     fileEditorStates.set(filePath, createEditorState(content));
   }
 
@@ -372,7 +582,8 @@ async function openFile(filePath) {
     el.classList.toggle('active', el.dataset.file === filePath));
   renderTabs();
   updateStatus();
-  setTimeout(() => view.focus(), 30);
+  updateWindowTitle();
+  if (focusEditor) setTimeout(() => view.focus(), 30);
 }
 window.openFile = openFile;
 
@@ -383,10 +594,8 @@ async function closeTab(filePath) {
     if (result === 'save') await saveFile(filePath);
     dirtyFiles.delete(filePath);
   }
-
   openTabs = openTabs.filter(f => f !== filePath);
   fileEditorStates.delete(filePath);
-
   if (filePath === currentFile) {
     if (openTabs.length > 0) {
       await openFile(openTabs[openTabs.length - 1]);
@@ -398,10 +607,9 @@ async function closeTab(filePath) {
       showWelcome(true);
       renderExplorer();
       renderTabs();
+      updateWindowTitle();
     }
-  } else {
-    renderTabs();
-  }
+  } else { renderTabs(); }
 }
 
 // ── Save File ───────────────────────────────────────────────────────────────────
@@ -409,18 +617,9 @@ async function saveFile(filePath) {
   const fp = filePath ?? currentFile;
   if (!fp) return;
   const content = fp === currentFile ? view.state.doc.toString() : (fileEditorStates.get(fp)?.doc.toString() ?? '');
-
-  if (usingMemory) {
-    memFiles[fp] = content;
-  } else {
-    const handle = fileHandles.get(fp);
-    if (!handle) return;
-    try {
-      const w = await handle.createWritable();
-      await w.write(content);
-      await w.close();
-    } catch (e) { console.error('Save failed:', e); return; }
-  }
+  try {
+    await invoke('write_file_text', { path: fp, content });
+  } catch (e) { console.error('Save failed:', e); return; }
   fileContents.set(fp, content);
   dirtyFiles.delete(fp);
   patchTabDirty(fp);
@@ -432,13 +631,11 @@ function showSaveDialog(filePath) {
   return new Promise(resolve => {
     const overlay = document.getElementById('save-dialog-overlay');
     document.getElementById('save-dialog-message').textContent =
-      `Do you want to save changes to "${filePath.split('/').pop()}"?`;
+      `Do you want to save changes to "${pathBasename(filePath)}"?`;
     overlay.classList.remove('hidden');
-
     const saveBtn = document.getElementById('save-dialog-save');
     const skipBtn = document.getElementById('save-dialog-dont-save');
     const cancelBtn = document.getElementById('save-dialog-cancel');
-
     const done = (result) => {
       overlay.classList.add('hidden');
       saveBtn.removeEventListener('click', onSave);
@@ -449,7 +646,6 @@ function showSaveDialog(filePath) {
     const onSave = () => done('save');
     const onSkip = () => done('discard');
     const onCancel = () => done('cancel');
-
     saveBtn.addEventListener('click', onSave);
     skipBtn.addEventListener('click', onSkip);
     cancelBtn.addEventListener('click', onCancel);
@@ -458,81 +654,52 @@ function showSaveDialog(filePath) {
 
 // ── Create File / Folder ────────────────────────────────────────────────────────
 async function doCreateFile(parentPath, name) {
-  const fullPath = parentPath ? `${parentPath}/${name}` : name;
-  if (usingMemory) {
-    memFiles[fullPath] = '';
-    fileContents.set(fullPath, '');
-    await openFile(fullPath);
-    return;
-  }
-  const dh = parentPath === '' ? rootDirHandle : dirHandles.get(parentPath);
-  if (!dh) return;
+  const fullPath = pathJoin(parentPath, name);
   try {
-    const fh = await dh.getFileHandle(name, { create: true });
-    fileHandles.set(fullPath, fh);
-    const empty = await fh.getFile();
-    fileContents.set(fullPath, await empty.text());
+    await invoke('create_file', { path: fullPath });
+    fileContents.set(fullPath, '');
     await refreshTree();
     await openFile(fullPath);
   } catch (e) { console.error('Create file failed:', e); }
 }
 
 async function doCreateDir(parentPath, name) {
-  if (usingMemory) return;
-  const fullPath = parentPath ? `${parentPath}/${name}` : name;
-  const dh = parentPath === '' ? rootDirHandle : dirHandles.get(parentPath);
-  if (!dh) return;
+  const fullPath = pathJoin(parentPath, name);
   try {
-    const nd = await dh.getDirectoryHandle(name, { create: true });
-    dirHandles.set(fullPath, nd);
+    await invoke('create_dir', { path: fullPath });
     expandedDirs.add(fullPath);
     await refreshTree();
   } catch (e) { console.error('Create dir failed:', e); }
 }
 
 function startInlineCreate(parentPath, type) {
-  if (!usingMemory && parentPath !== '' && !expandedDirs.has(parentPath)) {
-    expandedDirs.add(parentPath);
-  }
-  inlineCreator = { parentPath, type };
+  if (parentPath && !expandedDirs.has(parentPath)) expandedDirs.add(parentPath);
+  inlineCreator = { parentPath: parentPath || rootDirPath, type };
   renderExplorer();
 }
 
 // ── Delete Item ─────────────────────────────────────────────────────────────────
 async function deleteItem(filePath, isDir) {
-  const name = filePath.split('/').pop();
-  if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
-
-  if (usingMemory && !isDir) {
-    delete memFiles[filePath];
-    fileContents.delete(filePath);
-    if (openTabs.includes(filePath)) {
-      openTabs = openTabs.filter(f => f !== filePath);
-      fileEditorStates.delete(filePath); dirtyFiles.delete(filePath);
-      if (currentFile === filePath) {
-        if (openTabs.length > 0) await openFile(openTabs[openTabs.length - 1]);
-        else { currentFile = null; showWelcome(true); renderTabs(); }
-      } else renderTabs();
-    }
-    renderExplorer(); return;
-  }
-
-  const parentPath = filePath.includes('/') ? filePath.split('/').slice(0, -1).join('/') : '';
-  const ph = parentPath === '' ? rootDirHandle : dirHandles.get(parentPath);
-  if (!ph) return;
+  const name = pathBasename(filePath);
+  const confirmed = await ask(`Delete "${name}"? This cannot be undone.`, {
+    title: 'Confirm Delete', kind: 'warning', okLabel: 'Delete', cancelLabel: 'Cancel'
+  });
+  if (!confirmed) return;
   try {
-    await ph.removeEntry(name, { recursive: isDir });
+    await invoke('delete_item', { path: filePath, recursive: isDir });
     if (!isDir) {
-      fileHandles.delete(filePath); fileContents.delete(filePath); dirtyFiles.delete(filePath);
+      fileContents.delete(filePath);
+      dirtyFiles.delete(filePath);
       if (openTabs.includes(filePath)) {
         openTabs = openTabs.filter(f => f !== filePath);
         fileEditorStates.delete(filePath);
         if (currentFile === filePath) {
           if (openTabs.length > 0) await openFile(openTabs[openTabs.length - 1]);
-          else { currentFile = null; showWelcome(true); renderTabs(); }
+          else { currentFile = null; showWelcome(true); renderTabs(); updateWindowTitle(); }
         } else renderTabs();
       }
     }
+    selectedPaths.delete(filePath);
     await refreshTree();
   } catch (e) { console.error('Delete failed:', e); }
 }
@@ -545,7 +712,6 @@ function startRename(filePath, isDir) {
   if (!el) return;
   const nameEl = el.querySelector('.file-name, .dir-name');
   if (!nameEl) return;
-
   const original = nameEl.textContent;
   const input = document.createElement('input');
   input.type = 'text'; input.value = original;
@@ -553,7 +719,6 @@ function startRename(filePath, isDir) {
   input.autocomplete = 'off'; input.spellcheck = false;
   nameEl.replaceWith(input);
   input.select();
-
   let committed = false;
   const commit = async () => {
     if (committed) return; committed = true;
@@ -561,7 +726,6 @@ function startRename(filePath, isDir) {
     if (!newName || newName === original) { input.replaceWith(nameEl); return; }
     await doRename(filePath, isDir, original, newName);
   };
-
   input.addEventListener('keydown', async e => {
     if (e.key === 'Enter') { e.preventDefault(); await commit(); }
     else if (e.key === 'Escape') { e.preventDefault(); input.replaceWith(nameEl); }
@@ -570,73 +734,51 @@ function startRename(filePath, isDir) {
 }
 
 async function doRename(filePath, isDir, original, newName) {
-  const parentPath = filePath.includes('/') ? filePath.split('/').slice(0, -1).join('/') : '';
-  const newPath = parentPath ? `${parentPath}/${newName}` : newName;
-
-  if (usingMemory && !isDir) {
-    memFiles[newPath] = memFiles[filePath]; delete memFiles[filePath];
-    fileContents.set(newPath, fileContents.get(filePath) ?? ''); fileContents.delete(filePath);
-    const tabIdx = openTabs.indexOf(filePath);
-    if (tabIdx !== -1) openTabs[tabIdx] = newPath;
-    if (currentFile === filePath) currentFile = newPath;
-    const state = fileEditorStates.get(filePath);
-    if (state) { fileEditorStates.set(newPath, state); fileEditorStates.delete(filePath); }
-    if (dirtyFiles.has(filePath)) { dirtyFiles.add(newPath); dirtyFiles.delete(filePath); }
-    renderExplorer(); renderTabs();
-    if (currentFile === newPath) updateBreadcrumb(newPath);
-    return;
-  }
-
-  if (!isDir) {
-    const fh = fileHandles.get(filePath);
-    if (!fh) return;
-    const ph = parentPath === '' ? rootDirHandle : dirHandles.get(parentPath);
-    if (!ph) return;
-    try {
-      // Read → create new → delete old
-      const f = await fh.getFile(); const content = await f.text();
-      const nfh = await ph.getFileHandle(newName, { create: true });
-      const w = await nfh.createWritable(); await w.write(content); await w.close();
-      await ph.removeEntry(original);
-      fileHandles.set(newPath, nfh); fileHandles.delete(filePath);
-      fileContents.set(newPath, content); fileContents.delete(filePath);
+  const parentPath = pathDirname(filePath);
+  const newPath = pathJoin(parentPath, newName);
+  try {
+    await invoke('rename_item', { oldPath: filePath, newPath });
+    if (!isDir) {
+      const content = fileContents.get(filePath);
+      if (content !== undefined) { fileContents.set(newPath, content); fileContents.delete(filePath); }
       const tabIdx = openTabs.indexOf(filePath);
       if (tabIdx !== -1) openTabs[tabIdx] = newPath;
       if (currentFile === filePath) currentFile = newPath;
       const state = fileEditorStates.get(filePath);
       if (state) { fileEditorStates.set(newPath, state); fileEditorStates.delete(filePath); }
       if (dirtyFiles.has(filePath)) { dirtyFiles.add(newPath); dirtyFiles.delete(filePath); }
-      await refreshTree(); renderTabs();
-      if (currentFile === newPath) updateBreadcrumb(newPath);
-    } catch (e) { console.error('Rename failed:', e); }
-  } else {
-    alert('Folder rename is not supported via the browser File System API.\nCreate a new folder and move files manually.');
-  }
+    }
+    await refreshTree();
+    renderTabs();
+    if (currentFile === newPath) { updateBreadcrumb(newPath); updateWindowTitle(); }
+  } catch (e) { console.error('Rename failed:', e); }
 }
 
 // ── Breadcrumb ──────────────────────────────────────────────────────────────────
 function updateBreadcrumb(filePath) {
   const bc = document.getElementById('editor-breadcrumb');
   if (!bc) return;
-  const parts = filePath.split('/');
-  const all = [rootName, ...parts];
-  bc.innerHTML = all.map((p, i) => {
-    const isLast = i === all.length - 1;
-    const isRoot = i === 0;
-    const icon = isLast
-      ? getFileIcon(p)
-      : (isRoot ? '' : '<i class="fa-solid fa-folder" style="color:#E8AB4F;font-size:11px;"></i>');
+  let parts;
+  if (rootDirPath && filePath.startsWith(rootDirPath)) {
+    const rel = filePath.substring(rootDirPath.length).replace(/^[\\/]/, '');
+    parts = [rootName, ...rel.split(/[\\/]/)];
+  } else {
+    // File is outside the project — show the full absolute path
+    parts = filePath.split(/[\\/]/);
+  }
+  bc.innerHTML = parts.map((p, i) => {
+    const isLast = i === parts.length - 1;
+    const isFirst = i === 0;
+    const icon = isLast ? getFileIcon(p) : (isFirst ? '' : '<i class="fa-solid fa-folder" style="color:#E8AB4F;font-size:11px;"></i>');
     return `<span class="crumb${isLast ? ' current-file-crumb' : ''}">${icon ? icon + ' ' : ''}${p}</span>${!isLast ? '<i class="fa-solid fa-chevron-right crumb-separator"></i>' : ''}`;
   }).join('');
 }
 
 // ── Welcome Screen ──────────────────────────────────────────────────────────────
-function showWelcome(show) {
+async function showWelcome(show) {
   const welcome = document.getElementById('editor-welcome');
-  const msg = document.getElementById('welcome-message');
-  const btn = document.getElementById('welcome-open-btn');
-  const bc = document.getElementById('editor-breadcrumb');
   const wrap = document.getElementById('editor-wrap');
+  const bc = document.getElementById('editor-breadcrumb');
   const header = document.querySelector('.editor-header');
 
   if (show) {
@@ -644,13 +786,13 @@ function showWelcome(show) {
     wrap.style.display = 'none';
     if (bc) bc.style.display = 'none';
     if (header) header.style.display = 'none';
-    
-    if (usingMemory) {
-      msg.textContent = 'Open a folder to start editing';
-      btn.style.display = 'inline-block';
+
+    if (!rootDirPath) {
+      await renderWelcomeScreen();
     } else {
-      msg.textContent = 'Select a file to start editing';
-      btn.style.display = 'none';
+      welcome.innerHTML = `
+        <i class="fa-brands fa-python" style="font-size:48px;color:#4B8BBE;opacity:0.3;"></i>
+        <p id="welcome-message">Select a file to start editing</p>`;
     }
   } else {
     welcome.style.display = 'none';
@@ -660,17 +802,100 @@ function showWelcome(show) {
   }
 }
 
-document.getElementById('welcome-open-btn').addEventListener('click', () => openFolder());
+async function renderWelcomeScreen() {
+  const welcome = document.getElementById('editor-welcome');
+  const recents = await getRecentProjects();
+
+  let recentsHtml = '';
+  if (recents.length > 0) {
+    recentsHtml = `
+      <div class="welcome-section">
+        <h3 class="welcome-section-title">Recent Projects</h3>
+        <div class="recent-list">
+          ${recents.map(r => `
+            <div class="recent-item" data-path="${r.path}">
+              <i class="fa-solid fa-folder" style="color:#E8AB4F;"></i>
+              <div class="recent-info">
+                <span class="recent-name">${r.name}</span>
+                <span class="recent-path">${r.path}</span>
+              </div>
+              <button class="recent-remove" data-path="${r.path}" title="Remove from recents">
+                <i class="fa-solid fa-xmark"></i>
+              </button>
+            </div>
+          `).join('')}
+        </div>
+      </div>`;
+  }
+
+  welcome.innerHTML = `
+    <div class="welcome-hero">
+      <div class="welcome-logo">⚡</div>
+      <h1 class="welcome-title">Axiom IDE</h1>
+      <p class="welcome-subtitle">Blazing-fast code editor</p>
+    </div>
+    <div class="welcome-actions">
+      <button class="welcome-action-btn" id="welcome-open-folder">
+        <i class="fa-solid fa-folder-open"></i>
+        <span>Open Folder</span>
+        <span class="welcome-shortcut">Ctrl+K Ctrl+O</span>
+      </button>
+      <button class="welcome-action-btn" id="welcome-open-file">
+        <i class="fa-solid fa-file"></i>
+        <span>Open File</span>
+        <span class="welcome-shortcut">Ctrl+O</span>
+      </button>
+    </div>
+    ${recentsHtml}
+  `;
+
+  welcome.querySelector('#welcome-open-folder')?.addEventListener('click', () => openFolder());
+  welcome.querySelector('#welcome-open-file')?.addEventListener('click', () => openSingleFile());
+  welcome.querySelectorAll('.recent-item').forEach(el => {
+    el.addEventListener('click', (e) => {
+      if (e.target.closest('.recent-remove')) return;
+      openFolder(el.dataset.path);
+    });
+  });
+  welcome.querySelectorAll('.recent-remove').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      await removeRecentProject(btn.dataset.path);
+      await renderWelcomeScreen();
+    });
+  });
+}
+
+// ── Open Single File ────────────────────────────────────────────────────────────
+async function openSingleFile() {
+  if (!IS_TAURI) return;
+  const selected = await dialogOpen({
+    multiple: false,
+    title: 'Open File',
+    filters: [
+      { name: 'Code Files', extensions: ['py', 'js', 'ts', 'json', 'html', 'css', 'md', 'txt', 'rs', 'toml'] },
+      { name: 'All Files', extensions: ['*'] }
+    ]
+  });
+  if (!selected) return;
+  const filePath = typeof selected === 'string' ? selected : selected.path;
+  if (!filePath) return;
+  // If no folder is open yet, open the parent folder of this file as a project
+  if (!rootDirPath) {
+    await openFolder(pathDirname(filePath));
+  }
+  await openFile(filePath);
+}
 
 // ── Context Menu ────────────────────────────────────────────────────────────────
 const ctxMenu = document.getElementById('context-menu');
 
 function showCtxMenu(x, y) {
-  if (usingMemory) return;
+  if (!rootDirPath) return;
   ctxMenu.innerHTML = '';
   const isDir = activeContextIsDir;
   const p = activeContextPath;
-  const parentOfSelected = isDir ? p : (p.includes('/') ? p.split('/').slice(0, -1).join('/') : '');
+  const parentOfSelected = isDir ? p : pathDirname(p);
   const createTarget = isDir ? p : parentOfSelected;
 
   const item = (label, icon, fn, danger = false) => {
@@ -714,13 +939,13 @@ window.addEventListener('mouseup', () => { if (isResizing) { isResizing = false;
 // ── Explorer Toolbar ────────────────────────────────────────────────────────────
 document.getElementById('action-new-file').addEventListener('click', e => {
   e.stopPropagation();
-  const parent = (currentFile && currentFile.includes('/')) ? currentFile.split('/').slice(0, -1).join('/') : '';
-  startInlineCreate(parent, 'file');
+  const parent = currentFile ? pathDirname(currentFile) : rootDirPath;
+  startInlineCreate(parent || rootDirPath, 'file');
 });
 document.getElementById('action-new-folder').addEventListener('click', e => {
   e.stopPropagation();
-  const parent = (currentFile && currentFile.includes('/')) ? currentFile.split('/').slice(0, -1).join('/') : '';
-  startInlineCreate(parent, 'directory');
+  const parent = currentFile ? pathDirname(currentFile) : rootDirPath;
+  startInlineCreate(parent || rootDirPath, 'directory');
 });
 document.getElementById('action-refresh').addEventListener('click', async e => { e.stopPropagation(); await refreshTree(); });
 document.getElementById('action-collapse').addEventListener('click', e => { e.stopPropagation(); expandedDirs.clear(); renderExplorer(); });
@@ -772,6 +997,7 @@ const paletteList    = document.getElementById('palette-list');
 
 const commands = [
   { id: 'open-folder',       label: 'File: Open Folder...' },
+  { id: 'open-file',         label: 'File: Open File...' },
   { id: 'new-file',          label: 'File: New File' },
   { id: 'new-folder',        label: 'File: New Folder' },
   { id: 'save-file',         label: 'File: Save' },
@@ -797,26 +1023,53 @@ function togglePalette(forceClose = false, mode = 'command') {
   }
 }
 
+function getRelativePath(fullPath) {
+  if (rootDirPath && fullPath.startsWith(rootDirPath)) {
+    return fullPath.substring(rootDirPath.length).replace(/^[\\/]/, '');
+  }
+  return fullPath;
+}
+
 function renderPalette(q) {
   if (q.startsWith('>')) {
     const s = q.slice(1).trim().toLowerCase();
     filteredCmds = commands.filter(c => c.label.toLowerCase().includes(s));
   } else {
     const s = q.toLowerCase();
-    const allFiles = usingMemory ? Object.keys(memFiles) : [...fileHandles.keys()];
-    filteredCmds = allFiles.filter(f => f.toLowerCase().includes(s))
-      .map(f => ({ id: 'open-file:' + f, label: f, isFile: true }));
+    const allFiles = fileTree ? getAllFilePaths(fileTree.children) : [];
+    const relPaths = allFiles.map(f => ({ full: f, rel: getRelativePath(f), base: pathBasename(f) }));
+    filteredCmds = relPaths
+      .filter(f => f.base.toLowerCase().includes(s) || f.rel.toLowerCase().includes(s))
+      .map(f => ({ id: 'open-file:' + f.full, label: f.base, sublabel: f.rel, isFile: true }));
   }
   selIdx = 0;
   paletteList.innerHTML = '';
   filteredCmds.forEach((cmd, i) => {
     const el = document.createElement('div');
     el.className = 'palette-item' + (i === 0 ? ' active' : '');
-    el.innerHTML = cmd.isFile ? `${getFileIcon(cmd.label)}<span style="margin-left:8px">${cmd.label}</span>` : cmd.label;
+    if (cmd.isFile) {
+      // Show relative path from project root below the filename
+      const dirPart = cmd.sublabel.includes('/') || cmd.sublabel.includes('\\') 
+        ? cmd.sublabel.split(/[\\/]/).slice(0, -1).join('/') 
+        : '';
+      el.innerHTML = `${getFileIcon(cmd.label)}<span style="margin-left:8px">${cmd.label}</span>${dirPart ? `<span class="palette-path">${dirPart}</span>` : ''}`;
+    } else {
+      el.innerHTML = cmd.label;
+    }
     el.onclick = () => execCmd(cmd.id);
     el.addEventListener('mouseenter', () => { document.querySelectorAll('.palette-item').forEach(x => x.classList.remove('active')); el.classList.add('active'); selIdx = i; });
     paletteList.appendChild(el);
   });
+}
+
+function getAllFilePaths(nodes) {
+  const paths = [];
+  if (!nodes) return paths;
+  for (const n of nodes) {
+    if (n.type === 'file') paths.push(n.path);
+    else if (n.children) paths.push(...getAllFilePaths(n.children));
+  }
+  return paths;
 }
 
 function execCmd(id) {
@@ -824,17 +1077,16 @@ function execCmd(id) {
   if (id.startsWith('open-file:')) { openFile(id.slice(10)); return; }
   switch (id) {
     case 'open-folder':     openFolder(); break;
+    case 'open-file':       openSingleFile(); break;
     case 'new-file':
-      if (usingMemory) { alert('Please open a folder first.'); return; }
-      { const p = (currentFile && currentFile.includes('/')) ? currentFile.split('/').slice(0, -1).join('/') : ''; startInlineCreate(p, 'file'); }
+      if (!rootDirPath) { alert('Please open a folder first.'); return; }
+      { const p = currentFile ? pathDirname(currentFile) : rootDirPath; startInlineCreate(p, 'file'); }
       break;
     case 'new-folder':
-      if (usingMemory) { alert('Please open a folder first.'); return; }
-      { const p = (currentFile && currentFile.includes('/')) ? currentFile.split('/').slice(0, -1).join('/') : ''; startInlineCreate(p, 'directory'); }
+      if (!rootDirPath) { alert('Please open a folder first.'); return; }
+      { const p = currentFile ? pathDirname(currentFile) : rootDirPath; startInlineCreate(p, 'directory'); }
       break;
-    case 'save-file':
-      if (usingMemory) return;
-      saveFile(); break;
+    case 'save-file':       saveFile(); break;
     case 'close-editor':    if (currentFile) closeTab(currentFile); break;
     case 'toggle-glow':
       isGlowEnabled = !isGlowEnabled;
@@ -879,7 +1131,6 @@ const keybindings = [
   { id: 'editor.selectAll',          command: 'Select All',                 keys: 'Ctrl+A',          source: 'Default' },
   { id: 'editor.find',               command: 'Find',                       keys: 'Ctrl+F',          source: 'Default' },
   { id: 'editor.replace',            command: 'Find and Replace',           keys: 'Ctrl+H',          source: 'Default' },
-  { id: 'editor.addSelectionNext',   command: 'Add Next Occurrence',        keys: 'Ctrl+D',          source: 'Default' },
   { id: 'editor.indent',             command: 'Indent Line',                keys: 'Tab',             source: 'Default' },
   { id: 'editor.outdent',            command: 'Outdent Line',               keys: 'Shift+Tab',       source: 'Default' },
   { id: 'workbench.quickOpen',       command: 'Go to File',                 keys: 'Ctrl+P',          source: 'Default' },
@@ -889,6 +1140,7 @@ const keybindings = [
   { id: 'workbench.saveFile',        command: 'Save File',                  keys: 'Ctrl+S',          source: 'Default' },
   { id: 'workbench.closeEditor',     command: 'Close Editor',               keys: 'Ctrl+W',          source: 'Default' },
   { id: 'workbench.openFolder',      command: 'Open Folder',                keys: 'Ctrl+K Ctrl+O',   source: 'Default' },
+  { id: 'workbench.openFile',        command: 'Open File',                  keys: 'Ctrl+O',          source: 'Default' },
   { id: 'preferences.glow',         command: 'Toggle Neon Glow',           keys: 'Ctrl+Alt+G',      source: 'Default' },
   { id: 'preferences.rgbGlow',      command: 'Toggle RGB Glow',            keys: 'Ctrl+Alt+R',      source: 'Default' },
   { id: 'preferences.rgbText',      command: 'Toggle RGB Text',            keys: 'Ctrl+Alt+T',      source: 'Default' },
@@ -981,6 +1233,7 @@ function handleMenu(action) {
     case 'new-file':          execCmd('new-file'); break;
     case 'new-folder':        execCmd('new-folder'); break;
     case 'open-folder':       openFolder(); break;
+    case 'open-file':         openSingleFile(); break;
     case 'save-file':         saveFile(); break;
     case 'close-editor':      if (currentFile) closeTab(currentFile); break;
     case 'refresh-explorer':  refreshTree(); break;
@@ -1007,11 +1260,22 @@ window.addEventListener('keydown', async e => {
   const ctrl = e.ctrlKey, shift = e.shiftKey, alt = e.altKey;
   const k = e.key.toLowerCase();
 
+  // Delete key: delete selected items in explorer (skip if editor has focus)
+  if (e.key === 'Delete' && !ctrl && !shift && !alt) {
+    const editorFocused = document.activeElement?.closest('.cm-editor');
+    if (!editorFocused && selectedPaths.size > 0) {
+      e.preventDefault();
+      await deleteSelected();
+      return;
+    }
+  }
+
   if (ctrl && !shift && !alt && k === 's') { e.preventDefault(); await saveFile(); return; }
   if (ctrl && !shift && !alt && k === 'n') { e.preventDefault(); execCmd('new-file'); return; }
   if (ctrl && !shift && !alt && k === 'w') { e.preventDefault(); if (currentFile) closeTab(currentFile); return; }
   if (ctrl && !shift && !alt && k === 'p') { e.preventDefault(); togglePalette(false, 'file'); return; }
   if (ctrl && shift  && !alt && k === 'p') { e.preventDefault(); togglePalette(false, 'command'); return; }
+  if (ctrl && !shift && !alt && k === 'o') { e.preventDefault(); openSingleFile(); return; }
   if (ctrl && !shift && !alt && k === 'k') { e.preventDefault(); ctrlKPending = true; return; }
   if (ctrlKPending) {
     if (ctrl && k === 's') { e.preventDefault(); ctrlKPending = false; openKeymapSettings(); return; }
