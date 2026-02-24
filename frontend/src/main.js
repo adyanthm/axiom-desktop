@@ -628,6 +628,8 @@ async function openFile(filePath, focusEditor = true) {
 
   showWelcome(false);
   document.getElementById('editor-wrap').style.display = 'flex';
+  const ea = document.getElementById('editor-actions');
+  if (ea) ea.style.display = 'flex';
   const bc = document.getElementById('editor-breadcrumb');
   if (bc) bc.style.display = 'flex';
 
@@ -658,6 +660,8 @@ async function closeTab(filePath) {
     } else {
       currentFile = null;
       document.getElementById('editor-wrap').style.display = 'none';
+      const ea = document.getElementById('editor-actions');
+      if (ea) ea.style.display = 'none';
       const bc = document.getElementById('editor-breadcrumb');
       if (bc) { bc.style.display = 'none'; bc.innerHTML = ''; }
       showWelcome(true);
@@ -1345,6 +1349,9 @@ window.addEventListener('keydown', async e => {
   if (ctrl && alt && k === 't') { e.preventDefault(); execCmd('toggle-rgb-text'); return; }
   if (ctrl && alt && k === 'z') { e.preventDefault(); execCmd('toggle-zoom'); return; }
   
+  if (!ctrl && !shift && !alt && k === 'f5') { e.preventDefault(); runCurrentFile(); return; }
+  if (ctrl && shift && !alt && k === 'r') { e.preventDefault(); runCurrentFile(); return; }
+
   if (ctrl && shift && !alt && (e.key === '`' || e.key === '~' || e.code === 'Backquote')) { e.preventDefault(); toggleTerminal(); return; }
 });
 
@@ -1429,7 +1436,36 @@ async function toggleTerminal() {
   }
 }
 
+// ── Run Current File ────────────────────────────────────────────────────────────
+async function runCurrentFile() {
+  if (!currentFile) return;
+  await saveFile(); // Ensure the file is saved first
+  const panel = document.getElementById('terminal-panel');
+  if (panel.style.display === 'none') {
+    await toggleTerminal();
+  } else {
+    if (term) term.focus();
+  }
+  
+  setTimeout(() => {
+    let cmd = '';
+    const ext = currentFile.split('.').pop().toLowerCase();
+    const quoted = `"${currentFile}"`;
+    if (ext === 'py') cmd = `python ${quoted}\r`;
+    else if (ext === 'js') cmd = `node ${quoted}\r`;
+    else if (ext === 'rs') cmd = `rustc ${quoted} && .\\${pathBasename(currentFile).replace('.rs', '.exe')}\r`;
+    else cmd = `echo "Cannot run file type: .${ext}"\r`;
+    
+    if (cmd && IS_TAURI) {
+      invoke('terminal_input', { input: cmd });
+    }
+  }, 100);
+}
+
+document.getElementById('run-btn')?.addEventListener('click', runCurrentFile);
+
 // ── Init ────────────────────────────────────────────────────────────────────────
 showWelcome(true);
 renderExplorer();
 renderTabs();
+
