@@ -12,8 +12,8 @@
 
 <br/>
 
-[![Stars](https://img.shields.io/github/stars/adyanthm/axiom?style=for-the-badge&color=528bff&labelColor=1a1d23)](https://github.com/adyanthm/axiom)
-[![Version](https://img.shields.io/badge/version-0.1.0-528bff?style=for-the-badge&labelColor=1a1d23)](https://github.com/adyanthm/axiom)
+[![Stars](https://img.shields.io/github/stars/adyanthm/axiom-desktop?style=for-the-badge&color=528bff&labelColor=1a1d23)](https://github.com/adyanthm/axiom-desktop)
+[![Version](https://img.shields.io/badge/version-0.1.0-528bff?style=for-the-badge&labelColor=1a1d23)](https://github.com/adyanthm/axiom-desktop)
 [![License](https://img.shields.io/badge/license-MIT-98c379?style=for-the-badge&labelColor=1a1d23)](./LICENSE.md)
 [![FOSS](https://img.shields.io/badge/FOSS-100%25-56b6c2?style=for-the-badge&labelColor=1a1d23)](#-free--open-source-software)
 [![Built With](https://img.shields.io/badge/backend-Rust%20%2B%20Tauri-e06c75?style=for-the-badge&labelColor=1a1d23)](https://tauri.app/)
@@ -252,7 +252,7 @@ These are intentional omissions to keep the editor lean:
 
 ```bash
 # Clone the repository
-git clone https://github.com/adyanthm/axiom.git
+git clone https://github.com/adyanthm/axiom-desktop.git
 cd axiom
 
 # Install frontend dependencies
@@ -310,7 +310,7 @@ Axiom is open-source and contributions are what keep it alive. Whether it's a bu
 **Please read [CONTRIBUTING.md](./CONTRIBUTING.md) before submitting anything.** It covers the repo structure, how to set up the dev environment, coding conventions, and the PR process in detail.
 
 Quick notes:
-- Open an **[Issue](https://github.com/adyanthm/axiom/issues)** before working on a substantial change
+- Open an **[Issue](https://github.com/adyanthm/axiom-desktop/issues)** before working on a substantial change
 - Keep PRs focused — one feature or fix per PR
 - Test on your platform (Windows / macOS / Linux)
 
@@ -326,6 +326,6 @@ Axiom IDE is released under the [MIT License](./LICENSE.md). Use it, fork it, sh
 
 Made with ⚡ and a hatred for slow editors.
 
-**[⭐ Star this repo](https://github.com/adyanthm/axiom)** if Axiom made your day a little faster.
+**[⭐ Star this repo](https://github.com/adyanthm/axiom-desktop)** if Axiom made your day a little faster.
 
 </div>

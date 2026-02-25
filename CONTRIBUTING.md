@@ -1,6 +1,6 @@
 # Contributing to Axiom IDE
 
-> **Repo:** [github.com/adyanthm/axiom](https://github.com/adyanthm/axiom)  
+> **Repo:** [github.com/adyanthm/axiom-desktop](https://github.com/adyanthm/axiom-desktop.git)  
 > **License:** [MIT](./LICENSE.md) — Axiom is 100% free and open-source software.
 
 First off — **thank you.** Axiom IDE is an open-source project, and every issue filed, suggestion made, and PR opened genuinely makes it better. Contributions of all sizes are welcome.
@@ -214,7 +214,7 @@ npm run tauri build
 ### Reporting Bugs
 
 Before opening a bug report:
-- Check the existing [Issues](https://github.com/adyanthm/axiom/issues) to see if it's already reported
+- Check the existing [Issues](https://github.com/adyanthm/axiom-desktop/issues) to see if it's already reported
 - Try reproducing in a clean state (close and reopen Axiom)
 
 When opening a bug report, include:
@@ -230,7 +230,7 @@ When opening a bug report, include:
 
 ### Suggesting Features
 
-Feature requests are welcome. Open an [Issue](https://github.com/adyanthm/axiom/issues) with the label `enhancement` and describe:
+Feature requests are welcome. Open an [Issue](https://github.com/adyanthm/axiom-desktop/issues) with the label `enhancement` and describe:
 
 - **What** you want to add
 - **Why** it fits Axiom's philosophy (fast, lightweight, no bloat)
@@ -242,7 +242,7 @@ Feature requests are welcome. Open an [Issue](https://github.com/adyanthm/axiom/
 
 #### 1. Open an Issue First
 
-For anything non-trivial, [open an Issue](https://github.com/adyanthm/axiom/issues) first. This ensures your work aligns with the project direction before you invest time.
+For anything non-trivial, [open an Issue](https://github.com/adyanthm/axiom-desktop/issues) first. This ensures your work aligns with the project direction before you invest time.
 
 #### 2. Fork & Branch
 
@@ -561,7 +561,7 @@ The following are unlikely to be accepted as they conflict with the project's co
 - React, Vue, Angular, or any frontend framework
 - Electron migration
 
-When in doubt, [open an Issue](https://github.com/adyanthm/axiom/issues) and ask. It's much better to align upfront than to put in effort on something that won't be merged.
+When in doubt, [open an Issue](https://github.com/adyanthm/axiom-desktop/issues) and ask. It's much better to align upfront than to put in effort on something that won't be merged.
 
 ---
 
@@ -569,7 +569,7 @@ When in doubt, [open an Issue](https://github.com/adyanthm/axiom/issues) and ask
 
 Every contribution makes Axiom faster, more stable, and more useful. Whether you're fixing a typo in the docs or adding a major feature — **it matters.**
 
-If you have questions, open a [Discussion](https://github.com/adyanthm/axiom/discussions) or an [Issue](https://github.com/adyanthm/axiom/issues). We're happy to help.
+If you have questions, open a [Discussion](https://github.com/adyanthm/axiom-desktop/discussions) or an [Issue](https://github.com/adyanthm/axiom-desktop/issues). We're happy to help.
 
 ---
 
