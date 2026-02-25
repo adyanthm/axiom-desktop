@@ -29,7 +29,26 @@
 
 <br/>
 
+[**🚀 Download for Windows, macOS, or Linux**](https://github.com/adyanthm/axiom-desktop/releases/latest)
+
+*Grab the latest stable release and start coding in seconds.*
+
+<br/>
+
 </div>
+
+---
+
+## 📥 Quick Start: Just want to use Axiom?
+
+If you aren't a developer looking to contribute and just want to use the editor, **do not build from source.**
+
+1.  Go to the **[Releases Page](https://github.com/adyanthm/axiom-desktop/releases/latest)**.
+2.  Download the installer for your platform:
+    *   **Windows**: `.msi` or `.exe`
+    *   **macOS**: `.dmg` (Universal binary for Intel & Apple Silicon)
+    *   **Linux**: `.AppImage` or `.deb`
+3.  Install and run. That's it!
 
 ---
 
