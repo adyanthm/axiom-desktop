@@ -127,6 +127,11 @@ fn start_terminal(app: AppHandle, cwd: Option<String>) -> Result<(), String> {
         std::env::var("SHELL").unwrap_or_else(|_| "bash".to_string())
     });
 
+    // Strip AppImage environment variables that break PTY child processes.
+    cmd.env_remove("PYTHONHOME");
+    cmd.env_remove("PYTHONPATH");
+    cmd.env_remove("LD_LIBRARY_PATH");
+
     if let Some(dir) = cwd {
         cmd.cwd(Path::new(&dir));
     }
