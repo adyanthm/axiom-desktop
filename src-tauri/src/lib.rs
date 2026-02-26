@@ -1,3 +1,5 @@
+mod live_server;
+
 use serde::Serialize;
 use std::fs;
 use std::path::Path;
@@ -8,6 +10,8 @@ use portable_pty::{CommandBuilder, NativePtySystem, PtySize, PtySystem};
 struct AppState {
     pty_pair: Mutex<Option<Box<dyn portable_pty::MasterPty + Send>>>,
     writer: Mutex<Option<Box<dyn std::io::Write + Send>>>,
+    live_server_tx: Mutex<Option<tokio::sync::broadcast::Sender<()>>>,
+    live_server_port: Mutex<Option<u16>>,
 }
 
 #[derive(Serialize)]
@@ -179,6 +183,32 @@ fn resize_terminal(rows: u16, cols: u16, state: tauri::State<'_, AppState>) -> R
     Ok(())
 }
 
+#[tauri::command]
+async fn start_live_server(
+    port: u16,
+    dir: String,
+    state: tauri::State<'_, AppState>,
+) -> Result<u16, String> {
+    if let Some(p) = *state.live_server_port.lock().unwrap() {
+        return Ok(p);
+    }
+    match live_server::start_live_server(port, dir).await {
+        Ok((p, tx)) => {
+            *state.live_server_port.lock().unwrap() = Some(p);
+            *state.live_server_tx.lock().unwrap() = Some(tx);
+            Ok(p)
+        }
+        Err(e) => Err(e),
+    }
+}
+
+#[tauri::command]
+fn notify_live_server(state: tauri::State<'_, AppState>) {
+    if let Some(tx) = state.live_server_tx.lock().unwrap().as_ref() {
+        let _ = tx.send(());
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -198,11 +228,15 @@ pub fn run() {
             start_terminal,
             terminal_input,
             resize_terminal,
+            start_live_server,
+            notify_live_server,
         ])
         .setup(|app| {
             app.manage(AppState {
                 pty_pair: Mutex::new(None),
                 writer: Mutex::new(None),
+                live_server_tx: Mutex::new(None),
+                live_server_port: Mutex::new(None),
             });
             if cfg!(debug_assertions) {
                 app.handle().plugin(

@@ -99,6 +99,22 @@ The terminal opens in your **project's working directory** and behaves exactly l
 
 ---
 
+## 🔥 Live Server
+
+Axiom includes a built-in, lightning-fast **Live Server** for web development. No more manual browser refreshes — your changes are pushed instantly via a native Rust SSE (Server-Sent Events) backend.
+
+![Live Server Demo](./media/liveserver.gif)
+
+| Feature | Details |
+|---|---|
+| **Instant Reload** | HTML files automatically refresh in the browser the millisecond you save (`Ctrl+S`) |
+| **Native Backend** | Powered by `axum` in Rust — handles static files with zero overhead |
+| **Port Fallback** | Automatically finds the next available port if your default is in use |
+| **Customizable** | Set your preferred port once and Axiom remembers it |
+| **How to Start** | Open any `.html` file and hit **Run (`F5`)** |
+
+---
+
 ## ✨ Features
 
 ### 🌍 Multi-Language Support
@@ -174,7 +190,6 @@ Access it via `Ctrl+K, Ctrl+S` or **View → Keyboard Shortcuts**.
 |---|---|
 | Save File | `Ctrl+S` |
 | New File | `Ctrl+N` |
-| Close Editor | `Ctrl+W` |
 | Open File | `Ctrl+O` |
 | Open Folder | `Ctrl+K Ctrl+O` |
 | Command Palette | `Ctrl+Shift+P` |
@@ -188,6 +203,7 @@ Access it via `Ctrl+K, Ctrl+S` or **View → Keyboard Shortcuts**.
 | Toggle RGB Glow | `Ctrl+Alt+R` |
 | Toggle RGB Text | `Ctrl+Alt+T` |
 | Toggle 300% Zoom | `Ctrl+Alt+Z` |
+| Change Live Server Port | (Command Palette) |
 | Undo / Redo | `Ctrl+Z` / `Ctrl+Y` |
 
 ---

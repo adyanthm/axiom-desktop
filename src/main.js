@@ -11,6 +11,7 @@ import { load as loadStore } from '@tauri-apps/plugin-store';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { open as openUrl } from '@tauri-apps/plugin-shell';
 import { Terminal } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
 import 'xterm/css/xterm.css';
@@ -732,6 +733,10 @@ async function saveFile(filePath) {
   dirtyFiles.delete(fp);
   patchTabDirty(fp);
   patchExplorerDirty(fp);
+
+  if (fp.toLowerCase().endsWith('.html')) {
+    try { await invoke('notify_live_server'); } catch(e){}
+  }
 }
 
 // ── Save Dialog ─────────────────────────────────────────────────────────────────
@@ -757,6 +762,42 @@ function showSaveDialog(filePath) {
     saveBtn.addEventListener('click', onSave);
     skipBtn.addEventListener('click', onSkip);
     cancelBtn.addEventListener('click', onCancel);
+  });
+}
+
+function showPrompt(title, message, defaultValue = '') {
+  return new Promise(resolve => {
+    const overlay = document.getElementById('prompt-dialog-overlay');
+    document.getElementById('prompt-dialog-title').textContent = title;
+    document.getElementById('prompt-dialog-message').textContent = message;
+    const input = document.getElementById('prompt-dialog-input');
+    input.value = defaultValue;
+    
+    overlay.classList.remove('hidden');
+    input.focus();
+    input.select();
+    
+    const okBtn = document.getElementById('prompt-dialog-ok');
+    const cancelBtn = document.getElementById('prompt-dialog-cancel');
+    
+    const done = (result) => {
+      overlay.classList.add('hidden');
+      okBtn.removeEventListener('click', onOk);
+      cancelBtn.removeEventListener('click', onCancel);
+      input.removeEventListener('keydown', onKey);
+      resolve(result);
+    };
+    
+    const onOk = () => done(input.value.trim());
+    const onCancel = () => done(null);
+    const onKey = (e) => {
+      if (e.key === 'Enter') onOk();
+      if (e.key === 'Escape') onCancel();
+    };
+    
+    okBtn.addEventListener('click', onOk);
+    cancelBtn.addEventListener('click', onCancel);
+    input.addEventListener('keydown', onKey);
   });
 }
 
@@ -1114,7 +1155,7 @@ const commands = [
   { id: 'toggle-glow',       label: 'Preferences: Toggle Neon Glow Effect' },
   { id: 'toggle-rgb-glow',   label: 'Preferences: Toggle RGB Moving Glow Effect' },
   { id: 'open-keybindings',  label: 'Preferences: Open Keyboard Shortcuts' },
-  { id: 'close-editor',      label: 'View: Close Editor' },
+  { id: 'change-live-server-port', label: 'Live Server: Change Port' },
   { id: 'open-folder',       label: 'File: Open Folder...' },
   { id: 'open-file',         label: 'File: Open File...' },
   { id: 'new-file',          label: 'File: New File' },
@@ -1206,7 +1247,6 @@ function execCmd(id) {
       { const p = currentFile ? pathDirname(currentFile) : rootDirPath; startInlineCreate(p, 'directory'); }
       break;
     case 'save-file':       saveFile(); break;
-    case 'close-editor':    if (currentFile) closeTab(currentFile); break;
     case 'toggle-glow':
       isGlowEnabled = !isGlowEnabled;
       isRgbGlowEnabled = false; isRgbTextEnabled = false;
@@ -1229,6 +1269,17 @@ function execCmd(id) {
       else { document.body.classList.remove('zoom-active'); view.dom.style.removeProperty('--caret-x'); view.dom.style.removeProperty('--caret-y'); } break;
     case 'open-keybindings': openKeymapSettings(); break;
     case 'toggle-terminal': toggleTerminal(); break;
+    case 'change-live-server-port':
+      (async () => {
+        let defaultPort = await getStore().then(s => s.get('liveServerPort')).catch(() => null);
+        let port = await showPrompt('Live Server', 'Enter new Live Server port:', defaultPort || '5500');
+        if (port && !isNaN(parseInt(port))) {
+            let store = await getStore();
+            await store.set('liveServerPort', parseInt(port));
+            await store.save();
+        }
+      })();
+      break;
   }
 }
 
@@ -1257,14 +1308,14 @@ const keybindings = [
   { id: 'workbench.commandPalette',  command: 'Open Command Palette',       keys: 'Ctrl+Shift+P',    source: 'Default' },
   { id: 'workbench.openKeybindings', command: 'Open Keyboard Shortcuts',    keys: 'Ctrl+K Ctrl+S',   source: 'Default' },
   { id: 'workbench.newFile',         command: 'New File',                   keys: 'Ctrl+N',          source: 'Default' },
-  { id: 'workbench.saveFile',        command: 'Save File',                  keys: 'Ctrl+S',          source: 'Default' },
-  { id: 'workbench.closeEditor',     command: 'Close Editor',               keys: 'Ctrl+W',          source: 'Default' },
+  { id: 'workbench.save',            command: 'Save',                       keys: 'Ctrl+S',          source: 'Default' },
   { id: 'workbench.openFolder',      command: 'Open Folder',                keys: 'Ctrl+K Ctrl+O',   source: 'Default' },
   { id: 'workbench.openFile',        command: 'Open File',                  keys: 'Ctrl+O',          source: 'Default' },
   { id: 'preferences.glow',         command: 'Toggle Neon Glow',           keys: 'Ctrl+Alt+G',      source: 'Default' },
   { id: 'preferences.rgbGlow',      command: 'Toggle RGB Glow',            keys: 'Ctrl+Alt+R',      source: 'Default' },
   { id: 'preferences.rgbText',      command: 'Toggle RGB Text',            keys: 'Ctrl+Alt+T',      source: 'Default' },
   { id: 'preferences.zoom',         command: 'Toggle 300% Zoom',           keys: 'Ctrl+Alt+Z',      source: 'Default' },
+  { id: 'liveserver.changePort',     command: 'Change Live Server Port',    keys: '',                source: 'Default' },
 ];
 
 const keymapOverlay = document.getElementById('keymap-overlay');
@@ -1355,7 +1406,6 @@ function handleMenu(action) {
     case 'open-folder':       openFolder(); break;
     case 'open-file':         openSingleFile(); break;
     case 'save-file':         saveFile(); break;
-    case 'close-editor':      if (currentFile) closeTab(currentFile); break;
     case 'refresh-explorer':  refreshTree(); break;
     case 'undo':              import('@codemirror/commands').then(m => m.undo(view)); break;
     case 'redo':              import('@codemirror/commands').then(m => m.redo(view)); break;
@@ -1366,6 +1416,7 @@ function handleMenu(action) {
     case 'replace':           import('@codemirror/search').then(m => m.openSearchPanel(view)); break;
     case 'command-palette':   togglePalette(false, 'command'); break;
     case 'keyboard-shortcuts':openKeymapSettings(); break;
+    case 'change-live-server-port': execCmd('change-live-server-port'); break;
     case 'toggle-glow':       execCmd('toggle-glow'); break;
     case 'toggle-rgb-glow':   execCmd('toggle-rgb-glow'); break;
     case 'toggle-rgb-text':   execCmd('toggle-rgb-text'); break;
@@ -1498,6 +1549,14 @@ async function toggleTerminal() {
 async function runCurrentFile() {
   if (!currentFile) return;
   await saveFile(); // Ensure the file is saved first
+  
+  const ext = currentFile.split('.').pop().toLowerCase();
+  
+  if (ext === 'html') {
+    startLiveServer(currentFile);
+    return;
+  }
+
   const panel = document.getElementById('terminal-panel');
   if (panel.style.display === 'none') {
     await toggleTerminal();
@@ -1507,7 +1566,6 @@ async function runCurrentFile() {
   
   setTimeout(() => {
     let cmd = '';
-    const ext = currentFile.split('.').pop().toLowerCase();
     const quoted = `"${currentFile}"`;
     if (ext === 'py') cmd = `python ${quoted}\r`;
     else if (ext === 'js') cmd = `node ${quoted}\r`;
@@ -1518,6 +1576,56 @@ async function runCurrentFile() {
       invoke('terminal_input', { input: cmd });
     }
   }, 100);
+}
+
+async function startLiveServer(file) {
+  let defaultPort = await getStore().then(s => s.get('liveServerPort'));
+  if (!defaultPort) {
+    const p = await showPrompt('Live Server', 'Select port for Live Server (e.g. 5500):', '5500');
+    if (!p) return;
+    defaultPort = parseInt(p, 10);
+    if (isNaN(defaultPort) || defaultPort <= 0) {
+      await showPrompt('Error', 'Invalid port. Please specify a number.', '');
+      return;
+    }
+    let store = await getStore();
+    await store.set('liveServerPort', defaultPort);
+    await store.save();
+  }
+  
+  const serveDir = rootDirPath || pathDirname(file);
+  try {
+    const finalPort = await invoke('start_live_server', {
+      port: defaultPort,
+      dir: serveDir
+    });
+    
+    if (finalPort !== defaultPort) {
+      console.log(`Live Server: Port ${defaultPort} was in use. Using ${finalPort} instead.`);
+      if (window.Notification && Notification.permission === 'granted') {
+        new Notification('Axiom Live Server', { body: `Port ${defaultPort} in use. Running on ${finalPort}.` });
+      } else if (window.Notification && Notification.permission !== 'denied') {
+        Notification.requestPermission().then(perm => {
+          if (perm === 'granted') new Notification('Axiom Live Server', { body: `Port ${defaultPort} in use. Running on ${finalPort}.` });
+        });
+      }
+    }
+    
+    let relPath = file.substring(serveDir.length).replace(/\\/g, '/');
+    if (relPath.startsWith('/')) relPath = relPath.substring(1);
+    
+    const url = `http://localhost:${finalPort}/${relPath}`;
+    
+    if (IS_TAURI) {
+      await openUrl(url);
+    } else {
+      window.open(url, '_blank');
+    }
+    
+  } catch (err) {
+    console.error('Failed to start Live Server:', err);
+    await showPrompt('Error', 'Failed to start Live Server: ' + err, '');
+  }
 }
 
 document.getElementById('run-btn')?.addEventListener('click', runCurrentFile);
