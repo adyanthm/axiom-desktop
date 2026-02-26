@@ -13,7 +13,7 @@
 <br/>
 
 [![Stars](https://img.shields.io/github/stars/adyanthm/axiom-desktop?style=for-the-badge&color=528bff&labelColor=1a1d23)](https://github.com/adyanthm/axiom-desktop)
-[![Version](https://img.shields.io/badge/version-0.1.0-528bff?style=for-the-badge&labelColor=1a1d23)](https://github.com/adyanthm/axiom-desktop)
+[![Version](https://img.shields.io/badge/version-0.1.1-528bff?style=for-the-badge&labelColor=1a1d23)](https://github.com/adyanthm/axiom-desktop)
 [![License](https://img.shields.io/badge/license-MIT-98c379?style=for-the-badge&labelColor=1a1d23)](./LICENSE.md)
 [![FOSS](https://img.shields.io/badge/FOSS-100%25-56b6c2?style=for-the-badge&labelColor=1a1d23)](#-free--open-source-software)
 [![Built With](https://img.shields.io/badge/backend-Rust%20%2B%20Tauri-e06c75?style=for-the-badge&labelColor=1a1d23)](https://tauri.app/)

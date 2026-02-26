@@ -1,7 +1,7 @@
 {
   "name": "axiom-editor",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Blazing fast code editor with multi language support, and all other neccessary things",
   "author": "Adyanth",
   "type": "module",
