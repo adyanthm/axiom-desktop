@@ -70,7 +70,7 @@ Axiom is a **desktop application** built with:
 └───────────────────────────────────────────────────────────┘
 ```
 
-- **Frontend:** Vanilla JavaScript, no frameworks. CodeMirror 6 for the editor, xterm.js for the terminal. All UI is constructed with standard DOM APIs.
+- **Frontend:** Vanilla JavaScript, utilizing ES Modules. CodeMirror 6 for the editor, xterm.js for the terminal. All UI is constructed with standard DOM APIs, cleanly split into logical modules.
 - **Backend:** Rust, compiled to a native binary. Handles file I/O, directory scanning, PTY terminal, and system integration via Tauri commands.
 - **Communication:** Frontend calls Rust functions via Tauri's `invoke()` IPC. Backend sends data to frontend via Tauri's `emit()` event system (used for terminal output streaming).
 
@@ -82,10 +82,18 @@ Axiom is a **desktop application** built with:
 axiom/
 ├── index.html                 # Single-page app shell — all panels and overlays
 ├── src/
-│   ├── main.js                # All frontend logic (~1500 lines)
-│   │                          #   Editor, tabs, file explorer, effects,
-│   │                          #   keybindings, command palette, terminal UI
-│   └── style.css              # All styles — pure CSS with custom properties
+│   ├── main.js                # Minimal frontend entry point
+│   ├── style.css              # All styles — pure CSS with custom variables
+│   └── modules/               # Modularized frontend logic
+│       ├── state.js           # Centralized global application state
+│       ├── editor.js          # CodeMirror instances and theming
+│       ├── terminal.js        # xterm.js integration and PTY sizing
+│       ├── fs.js              # Native filesystem commands
+│       ├── files.js           # File logic (open, save, drag-drop)
+│       ├── explorer.js        # File tree rendering UI
+│       ├── commands.js        # Fuzzy search and command execution
+│       ├── runner.js          # File execution and Live Server logic
+│       └── ...                # Other self-contained modules (tabs, etc)
 ├── src-tauri/
 │   ├── Cargo.toml             # Rust dependencies
 │   ├── tauri.conf.json        # Tauri app configuration
@@ -105,13 +113,12 @@ axiom/
 └── LICENSE.md                 # MIT License
 ```
 
-The entire application is intentionally structured in **as few files as possible**:
-- **1 HTML file** — all static UI structure
-- **1 JS file** — all frontend logic
-- **1 CSS file** — all styles
-- **1 Rust file** — all backend logic (plus a thin `main.rs` entry)
+The frontend architecture has been heavily refactored from a monolithic script into a clean **ES Module** structure:
+- **`src/modules/state.js`** is the single source of truth for all global variables.
+- Circular dependencies are strictly avoided using dynamic `import()` where necessary.
+- Rust logic remains tightly contained in `src-tauri/src/lib.rs`.
 
-**Keep it that way.** Adding extra files should require a very good reason. Axiom's simplicity is a feature, not a limitation.
+**Keep it modular.** When adding new features, isolate logic into specific modules to maintain the separation of concerns. Axiom's structural simplicity is a core feature, so avoid polluting global scopes.
 
 ---
 
@@ -294,34 +301,37 @@ Open a PR against the `main` branch. Include:
 
 There is no linter or formatter configured. Follow the conventions already present in the codebase.
 
-### JavaScript (`main.js`)
+### JavaScript (`src/modules/*.js`)
 
-- **No frameworks.** Vanilla JS only. No imports beyond the existing CodeMirror and Tauri packages.
+- **No frameworks.** Vanilla JS, operating strictly via ES modules.
+- **Global State:** All shared variables MUST live inside `export const state = {}` within `src/modules/state.js`. Never mutate global variables outside of this object.
+- **Circular Dependencies:** Avoid circular imports by using dynamic `import('./file.js')` when required inside execution flows.
 - **No TypeScript.** The project is intentionally plain JS for accessibility and simplicity.
 - Use `const` and `let` — never `var`.
 - Arrow functions for callbacks. Named functions (with `function` keyword) for top-level declarations.
-- Keep related logic grouped under its `// ── Section Name ──` comment header.
-- Global state sits at the top of `main.js`. Don't introduce module-level state scattered around the file.
-- Async functions that touch the Rust backend should use `await invoke(...)` — no raw `.then()` chains.
-- Tauri detection: check `IS_TAURI` before calling `invoke()` to support browser-only fallbacks.
+- Tauri detection: Wrap native OS/backend calls in `if (IS_TAURI) { ... }` (exported from `state.js`) to ensure browser fallback compatibility.
 
 **Example — Adding a new command:**
 ```javascript
-// 1. Add to the commands array (around line 1110)
+// 1. Add to the commands array in src/modules/commands.js
 const commands = [
   { id: 'your-command', label: 'Category: Your Command Description' },
   // ...
 ];
 
-// 2. Handle it in execCmd() (around line 1194)
+// 2. Handle it in execCmd() inside src/modules/commands.js
 case 'your-command':
   doYourThing();
   break;
 
-// 3. (Optional) Add a keyboard shortcut in the keydown listener (around line 1379)
-if (ctrl && alt && k === 'y') { e.preventDefault(); execCmd('your-command'); return; }
+// 3. (Optional) Add a keyboard shortcut in the global listener inside src/modules/menubar.js
+if (ctrl && alt && k === 'y') { 
+    e.preventDefault(); 
+    import('./commands.js').then(m => m.execCmd('your-command')); 
+    return; 
+}
 
-// 4. (Optional) Add to the keybindings array for the settings panel (around line 1245)
+// 4. (Optional) Add to the keybindings array for the settings panel in src/modules/keymap.js
 { id: 'your.command', command: 'Your Command', keys: 'Ctrl+Alt+Y', source: 'Default' },
 ```
 
@@ -422,7 +432,7 @@ PTY output → Rust reader thread → emit('terminal-output') → xterm.js write
 
 ### Language Support System
 
-Languages are registered in the `languageRegistry` object (top of `main.js`). Each entry maps a file extension to a lazy-loaded CodeMirror language package:
+Languages are registered in `src/modules/languages.js`. Each entry maps a file extension to a lazy-loaded CodeMirror language package:
 
 ```javascript
 const languageRegistry = {
@@ -435,9 +445,9 @@ const languageRegistry = {
 
 **To add a new language:**
 1. `npm install @codemirror/lang-yourlang`
-2. Add an entry to `languageRegistry`
-3. Add the file extension(s) to the icon map in `getFileIcon()`
-4. Add the extension to the file open dialog filter in `openSingleFile()`
+2. Add an entry to `languageRegistry` in `languages.js`
+3. Add the file extension(s) to the icon map map in `src/modules/icons.js`
+4. Add the extension to the file open dialog filter in `src/modules/files.js`
 
 ### Visual Effects System
 
@@ -447,7 +457,7 @@ Effects are toggled via CSS classes on `document.body`:
 - `rgb-text-effect` — Rainbow text
 - `zoom-tracking-effect` + `zoom-active` — 300% zoom
 
-All effect styles are defined in `style.css`. Effects are **mutually exclusive** — enabling one disables the others (handled in `execCmd()`).
+All effect styles are defined in `style.css`. Effects are **mutually exclusive** — enabling one disables the others. This routing is handled inside `src/modules/effects.js`.
 
 ### Command Palette System
 
