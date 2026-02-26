@@ -224,7 +224,7 @@ Axiom is **100% FOSS**, released under the [MIT License](./LICENSE.md).
 - ✅ **No telemetry** — zero data collection, zero phone-home, zero analytics
 - ✅ **No proprietary builds** — what you see on GitHub is what you run
 - ✅ **No extension marketplace** — no walled garden, no vendor lock-in
-- ✅ **No cloud dependencies** — works fully offline, always
+- ✅ **No cloud logic** — works fully offline (Note: file icons are fetched from VSCode Material Icon Theme via CDN)
 - ✅ **Fork it, modify it, ship it** — the MIT license means you can do whatever you want
 
 We believe development tools should respect your privacy, your machine, and your freedom. No exceptions.
@@ -316,6 +316,8 @@ npm run dev
 | **File System** | Rust `std::fs` via Tauri IPC |
 | **Persistent Storage** | `tauri-plugin-store` |
 | **Native Dialogs** | `tauri-plugin-dialog` |
+| **Icons** | [Material Icon Theme](https://github.com/PKief/vscode-material-icon-theme) (via JSDelivr) |
+| **UI Icons** | Font Awesome 6 |
 | **Styling** | Vanilla CSS with CSS custom properties |
 
 No React. No Angular. No Vue. No Electron. Just Rust + lean, handcrafted JavaScript.
