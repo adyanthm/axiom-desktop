@@ -1,0 +1,84 @@
+    Checking axiom-editor v0.1.2 (C:\Users\adyan\Desktop\AdyApps\IDE\src-tauri)
+error[E0432]: unresolved import `futures_util`
+ --> src\lsp.rs:1:5
+  |
+1 | use futures_util::{SinkExt, StreamExt};
+  |     ^^^^^^^^^^^^ help: a similar path exists: `jsonrpc_core::futures_util`
+
+warning: unused import: `std::sync::Arc`
+ --> src\lsp.rs:3:5
+  |
+3 | use std::sync::Arc;
+  |     ^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `tokio::sync::Mutex`
+ --> src\lsp.rs:7:5
+  |
+7 | use tokio::sync::Mutex;
+  |     ^^^^^^^^^^^^^^^^^^
+
+error[E0599]: the method `split` exists for struct `WebSocketStream<tokio::net::TcpStream>`, but its trait bounds were not satisfied
+   --> src\lsp.rs:37:54
+    |
+ 37 |     let (mut ws_sender, mut ws_receiver) = ws_stream.split();
+    |                                                      ^^^^^ method cannot be called on `WebSocketStream<tokio::net::TcpStream>` due to unsatisfied trait bounds
+    |
+   ::: C:\Users\adyan\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\tokio-tungstenite-0.28.0\src\lib.rs:192:1
+    |
+192 | pub struct WebSocketStream<S> {
+    | ----------------------------- doesn't satisfy `_: AsyncBufReadExt` or `_: AsyncBufRead`
+    |
+    = note: the following trait bounds were not satisfied:
+            `WebSocketStream<tokio::net::TcpStream>: AsyncBufRead`
+            which is required by `WebSocketStream<tokio::net::TcpStream>: AsyncBufReadExt`
+            `&WebSocketStream<tokio::net::TcpStream>: AsyncBufRead`
+            which is required by `&WebSocketStream<tokio::net::TcpStream>: AsyncBufReadExt`
+            `&mut WebSocketStream<tokio::net::TcpStream>: AsyncBufRead`
+            which is required by `&mut WebSocketStream<tokio::net::TcpStream>: AsyncBufReadExt`
+    = help: items from traits can only be used if the trait is in scope
+help: trait `StreamExt` which provides `split` is implemented but not in scope; perhaps you want to import it
+    |
+  1 + use futures::StreamExt;
+    |
+
+error: future cannot be sent between threads safely
+   --> src\lib.rs:219:1
+    |
+219 |   #[tauri::command]
+    |   ^^^^^^^^^^^^^^^^^ future returned by `get_lsp_port` is not `Send`
+...
+237 |           .invoke_handler(tauri::generate_handler![
+    |  _________________________-
+238 | |             read_file_text,
+239 | |             write_file_text,
+240 | |             list_dir,
+...   |
+251 | |             get_lsp_port,
+252 | |         ])
+    | |_________- in this macro invocation
+    |
+    = help: within `impl Future<Output = Result<u16, std::string::String>>`, the trait `Send` is not implemented for `std::sync::MutexGuard<'_, std::option::Option<u16>>`
+note: future is not `Send` as this value is used across an await
+   --> src\lib.rs:225:37
+    |
+221 |     let mut port_guard = state.lsp_port.lock().unwrap();
+    |         -------------- has type `std::sync::MutexGuard<'_, std::option::Option<u16>>` which is not `Send`
+...
+225 |     let p = lsp::start_lsp_server().await?;
+    |                                     ^^^^^ await occurs here, with `mut port_guard` maybe used later
+note: required by a bound in `ResultFutureTag::future`
+   --> C:\Users\adyan\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\tauri-2.10.2\src\ipc\command.rs:314:42
+    |
+310 |     pub async fn future<T, E, F>(self, value: F) -> Result<InvokeResponseBody, InvokeError>
+    |                  ------ required by a bound in this associated function
+...
+314 |       F: Future<Output = Result<T, E>> + Send,
+    |                                          ^^^^ required by this bound in `ResultFutureTag::future`
+    = note: this error originates in the macro `__cmd__get_lsp_port` which comes from the expansion of the macro `tauri::generate_handler` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+Some errors have detailed explanations: E0432, E0599.
+For more information about an error, try `rustc --explain E0432`.
+warning: `axiom-editor` (lib) generated 2 warnings
+error: could not compile `axiom-editor` (lib) due to 4 previous errors; 2 warnings emitted

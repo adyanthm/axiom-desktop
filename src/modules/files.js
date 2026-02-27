@@ -3,7 +3,7 @@ import { open as dialogOpen } from '@tauri-apps/plugin-dialog';
 import { state, IS_TAURI } from './state.js';
 import { pathBasename, pathDirname } from './utils.js';
 import { view, createEditorState } from './editor.js';
-import { getLanguageExtension } from './languages.js';
+import { getLanguageExtension, getLspExtension } from './languages.js';
 import { renderTabs, patchTabDirty } from './tabs.js';
 import { updateBreadcrumb } from './breadcrumb.js';
 import { updateStatus } from './statusbar.js';
@@ -44,7 +44,10 @@ export async function openFile(filePath, focusEditor = true) {
     }
     const ext     = filePath.split('.').pop();
     const langExt = await getLanguageExtension(ext);
-    state.fileEditorStates.set(filePath, createEditorState(content, langExt));
+    const lspExt  = await getLspExtension(filePath);
+    
+    // Combine base language highlighting with LSP features
+    state.fileEditorStates.set(filePath, createEditorState(content, [langExt, lspExt]));
   }
 
   if (!state.openTabs.includes(filePath)) state.openTabs.push(filePath);

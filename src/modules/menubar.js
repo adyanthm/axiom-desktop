@@ -66,6 +66,7 @@ function handleMenu(action) {
 
     case 'command-palette':   togglePalette(false, 'command'); break;
     case 'keyboard-shortcuts':openKeymapSettings(); break;
+    case 'manage-lsp':        execCmd('manage-lsp'); break;
     case 'change-live-server-port': execCmd('change-live-server-port'); break;
 
     case 'toggle-glow':       execCmd('toggle-glow'); break;

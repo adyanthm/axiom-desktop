@@ -2,6 +2,8 @@ import './style.css';
 import { showWelcome } from './modules/welcome.js';
 import { renderExplorer } from './modules/explorer.js';
 import { renderTabs } from './modules/tabs.js';
+import hljs from 'highlight.js';
+window.hljs = hljs;
 
 // Load modules that bind global event listeners to the DOM
 import './modules/editor.js';

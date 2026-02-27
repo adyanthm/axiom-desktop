@@ -1,0 +1,80 @@
+diff --git a/node_modules/codemirror-languageserver/dist/index.js b/node_modules/codemirror-languageserver/dist/index.js
+index 70a32da..bed7578 100644
+--- a/node_modules/codemirror-languageserver/dist/index.js
++++ b/node_modules/codemirror-languageserver/dist/index.js
+@@ -64,6 +64,7 @@ class LanguageServerClient {
+         this.requestManager = new RequestManager([this.transport]);
+         this.client = new Client(this.requestManager);
+         this.client.onNotification((data) => {
++            console.log('[LSP NOTIFY IN]', data);
+             this.processNotification(data);
+         });
+         const webSocketTransport = this.transport;
+@@ -71,6 +72,7 @@ class LanguageServerClient {
+             // XXX(hjr265): Need a better way to do this. Relevant issue:
+             // https://github.com/FurqanSoftware/codemirror-languageserver/issues/9
+             webSocketTransport.connection.addEventListener('message', (message) => {
++                console.log('[LSP MESSAGE IN]', message.data);
+                 const data = JSON.parse(message.data);
+                 if (data.method && data.id) {
+                     webSocketTransport.connection.send(JSON.stringify({
+@@ -195,9 +197,11 @@ class LanguageServerClient {
+         }
+     }
+     request(method, params, timeout) {
++        console.log('[LSP REQ OUT]', method, params);
+         return this.client.request({ method, params }, timeout);
+     }
+     notify(method, params) {
++        console.log('[LSP NOT OUT]', method, params);
+         return this.client.notify({ method, params });
+     }
+     processNotification(notification) {
+@@ -302,12 +306,17 @@ class LanguageServerPlugin {
+         }
+         const dom = document.createElement('div');
+         dom.classList.add('documentation');
+-        if (this.allowHTMLContent) {
+-            dom.innerHTML = await formatContents(contents);
+-        }
+-        else {
+-            dom.textContent = await formatContents(contents);
+-        }
++        dom.innerHTML = await formatContents(contents);
++        try {
++            dom.querySelectorAll('code').forEach((block) => {
++                if (window.hljs) {
++                    if (!block.className || !block.className.includes('language-')) {
++                        block.classList.add('language-' + this.languageId);
++                    }
++                    window.hljs.highlightElement(block);
++                }
++            });
++        } catch (e) {}
+         return {
+             pos,
+             end,
+@@ -411,12 +420,17 @@ class LanguageServerPlugin {
+                     return null;
+                 const dom = document.createElement('div');
+                 dom.classList.add('documentation');
+-                if (this.allowHTMLContent) {
+-                    dom.innerHTML = await formatContents(documentation);
+-                }
+-                else {
+-                    dom.textContent = await formatContents(documentation);
+-                }
++                dom.innerHTML = await formatContents(documentation);
++                try {
++                    dom.querySelectorAll('code').forEach((block) => {
++                        if (window.hljs) {
++                            if (!block.className || !block.className.includes('language-')) {
++                                block.classList.add('language-' + this.languageId);
++                            }
++                            window.hljs.highlightElement(block);
++                        }
++                    });
++                } catch (e) {}
+                 return dom;
+             };
+             return completion;

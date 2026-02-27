@@ -19,7 +19,8 @@ const commands = [
   { id: 'open-file',               label: 'File: Open File...' },
   { id: 'new-file',                label: 'File: New File' },
   { id: 'new-folder',              label: 'File: New Folder' },
-  { id: 'save-file',               label: 'File: Save' }
+  { id: 'save-file',               label: 'File: Save' },
+  { id: 'manage-lsp',              label: 'Preferences: Manage Language Servers' }
 ];
 
 let filteredCmds = [];
@@ -138,6 +139,7 @@ export async function execCmd(id) {
     case 'toggle-zoom':     import('./effects.js').then(m => m.toggleZoom()); break;
 
     case 'open-keybindings': import('./keymap.js').then(m => m.openKeymapSettings()); break;
+    case 'manage-lsp':       import('./lsp.js').then(m => m.openLspManager()); break;
     case 'toggle-terminal':  import('./terminal.js').then(m => m.toggleTerminal()); break;
 
     case 'change-live-server-port':

@@ -1,4 +1,5 @@
 mod live_server;
+mod lsp;
 
 use serde::Serialize;
 use std::fs;
@@ -12,6 +13,7 @@ struct AppState {
     writer: Mutex<Option<Box<dyn std::io::Write + Send>>>,
     live_server_tx: Mutex<Option<tokio::sync::broadcast::Sender<()>>>,
     live_server_port: Mutex<Option<u16>>,
+    lsp_port: Mutex<Option<u16>>,
 }
 
 #[derive(Serialize)]
@@ -214,6 +216,20 @@ fn notify_live_server(state: tauri::State<'_, AppState>) {
     }
 }
 
+#[tauri::command]
+async fn get_lsp_port(state: tauri::State<'_, AppState>) -> Result<u16, String> {
+    {
+        let port_guard = state.lsp_port.lock().unwrap();
+        if let Some(p) = *port_guard {
+            return Ok(p);
+        }
+    }
+    let p = lsp::start_lsp_server().await?;
+    let mut port_guard = state.lsp_port.lock().unwrap();
+    *port_guard = Some(p);
+    Ok(p)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -235,6 +251,7 @@ pub fn run() {
             resize_terminal,
             start_live_server,
             notify_live_server,
+            get_lsp_port,
         ])
         .setup(|app| {
             app.manage(AppState {
@@ -242,7 +259,9 @@ pub fn run() {
                 writer: Mutex::new(None),
                 live_server_tx: Mutex::new(None),
                 live_server_port: Mutex::new(None),
+                lsp_port: Mutex::new(None),
             });
+            
             if cfg!(debug_assertions) {
                 app.handle().plugin(
                     tauri_plugin_log::Builder::default()

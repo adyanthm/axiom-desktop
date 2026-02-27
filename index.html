@@ -9,6 +9,7 @@
     content="Blazing fast code editor with multi language support, and all other neccessary things" />
   <meta name="author" content="Adyanth" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
   <link rel="icon" type="image/png" href="/logo.png" />
 </head>
 
@@ -57,6 +58,7 @@
           <div class="menu-separator"></div>
           <div class="menu-entry" data-action="keyboard-shortcuts"><span>Keyboard Shortcuts</span><span
               class="menu-shortcut">Ctrl+K Ctrl+S</span></div>
+          <div class="menu-entry" data-action="manage-lsp"><span>Manage Language Servers</span></div>
           <div class="menu-entry" data-action="change-live-server-port"><span>Change Live Server Port</span></div>
           <div class="menu-separator"></div>
           <div class="menu-entry" data-action="toggle-glow"><span>Toggle Neon Glow</span><span
@@ -203,6 +205,30 @@
           <span class="keymap-col-source">Source</span>
         </div>
         <div class="keymap-table-body" id="keymap-table-body"></div>
+      </div>
+    </div>
+
+    <!-- LSP Manager Panel -->
+    <div id="lsp-overlay">
+      <div id="lsp-panel">
+        <div class="lsp-header">
+          <div class="lsp-header-left">
+            <i class="fa-solid fa-language" style="margin-right: 8px; color: var(--accent-color);"></i>
+            <span class="lsp-title">LSP Manager</span>
+          </div>
+          <button class="lsp-close-btn" id="lsp-close-btn"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="lsp-search-bar">
+          <i class="fa-solid fa-search" style="color: var(--text-muted); margin-right: 8px;"></i>
+          <input type="text" id="lsp-search" placeholder="Search language servers..." autocomplete="off"
+            spellcheck="false" />
+        </div>
+        <div class="lsp-table-header">
+          <span class="lsp-col-name">Language Server</span>
+          <span class="lsp-col-status">Status</span>
+          <span class="lsp-col-actions">Actions</span>
+        </div>
+        <div class="lsp-table-body" id="lsp-table-body"></div>
       </div>
     </div>
   </div>
