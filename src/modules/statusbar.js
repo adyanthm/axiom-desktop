@@ -13,6 +13,18 @@ export function updateStatus() {
   if (cursorEl) cursorEl.textContent = `Ln ${line.number}, Col ${col}`;
   const txt = view.state.doc.toString();
   if (wordsEl) wordsEl.textContent = `${txt.trim() === '' ? 0 : txt.trim().split(/\s+/).length} words`;
+
+  // Update LSP status in footer
+  const lspStatusEl = document.getElementById('sb-lsp-status');
+  if (lspStatusEl) {
+    if (state.lspError) {
+      lspStatusEl.textContent = state.lspError;
+      lspStatusEl.style.color = '#ff9800'; // Orange warning
+    } else {
+      lspStatusEl.textContent = 'LSP Active';
+      lspStatusEl.style.color = 'var(--accent-color)';
+    }
+  }
 }
 
 // Attach direct DOM listeners so cursor clicks update the bar immediately

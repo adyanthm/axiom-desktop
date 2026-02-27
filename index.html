@@ -58,7 +58,7 @@
           <div class="menu-separator"></div>
           <div class="menu-entry" data-action="keyboard-shortcuts"><span>Keyboard Shortcuts</span><span
               class="menu-shortcut">Ctrl+K Ctrl+S</span></div>
-          <div class="menu-entry" data-action="manage-lsp"><span>Manage Language Servers</span></div>
+
           <div class="menu-entry" data-action="change-live-server-port"><span>Change Live Server Port</span></div>
           <div class="menu-separator"></div>
           <div class="menu-entry" data-action="toggle-glow"><span>Toggle Neon Glow</span><span
@@ -138,6 +138,7 @@
     <!-- Status bar -->
     <div id="statusbar">
       <span id="sb-lang">Python 3</span>
+      <span id="sb-lsp-status" style="margin-left: 10px; font-weight: 500;"></span>
       <span id="sb-cursor">Ln 1, Col 1</span>
       <span class="sep"></span>
       <span id="sb-words">0 words</span>
@@ -208,29 +209,7 @@
       </div>
     </div>
 
-    <!-- LSP Manager Panel -->
-    <div id="lsp-overlay">
-      <div id="lsp-panel">
-        <div class="lsp-header">
-          <div class="lsp-header-left">
-            <i class="fa-solid fa-language" style="margin-right: 8px; color: var(--accent-color);"></i>
-            <span class="lsp-title">LSP Manager</span>
-          </div>
-          <button class="lsp-close-btn" id="lsp-close-btn"><i class="fa-solid fa-xmark"></i></button>
-        </div>
-        <div class="lsp-search-bar">
-          <i class="fa-solid fa-search" style="color: var(--text-muted); margin-right: 8px;"></i>
-          <input type="text" id="lsp-search" placeholder="Search language servers..." autocomplete="off"
-            spellcheck="false" />
-        </div>
-        <div class="lsp-table-header">
-          <span class="lsp-col-name">Language Server</span>
-          <span class="lsp-col-status">Status</span>
-          <span class="lsp-col-actions">Actions</span>
-        </div>
-        <div class="lsp-table-body" id="lsp-table-body"></div>
-      </div>
-    </div>
+
   </div>
   <script type="module" src="/src/main.js"></script>
 </body>

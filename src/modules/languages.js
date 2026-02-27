@@ -73,6 +73,9 @@ export async function getLspExtension(filePath) {
         if (!fileUri.startsWith('/')) fileUri = '/' + fileUri;
         fileUri = 'file://' + encodeURI(fileUri);
 
+        const { state: appState } = await import('./state.js');
+        appState.lspError = null; // Clear previous errors
+        
         const lspClientExt = languageServer({
           serverUri: `ws://127.0.0.1:${port}/pyright`, // connected to rust backend
           rootUri: rUri,
@@ -80,9 +83,14 @@ export async function getLspExtension(filePath) {
           languageId: 'python',
           allowHTMLContent: true
         });
+        
+        import('./statusbar.js').then(m => m.updateStatus());
         return lspClientExt;
       } catch (e) {
         console.error('Failed to init pyright lsp', e);
+        const { state: appState } = await import('./state.js');
+        appState.lspError = "Node.js not found. LSP can't be activated. Defaulted to lang-python";
+        import('./statusbar.js').then(m => m.updateStatus());
         return [];
       }
     }
