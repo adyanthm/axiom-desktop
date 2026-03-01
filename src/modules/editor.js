@@ -23,7 +23,43 @@ export function createEditorState(content, langExt = []) {
       lineNumbers(),
       highlightActiveLine(),
       highlightActiveLineGutter(),
-      autocompletion(),
+      autocompletion({
+        compareCompletions(a, b) {
+          // Tier 1: Keywords take absolute precedence
+          if (a.type === 'keyword' && b.type !== 'keyword') return -1;
+          if (b.type === 'keyword' && a.type !== 'keyword') return 1;
+
+          // Tier 2: De-prioritize Auto-imports to the very bottom
+          const isAutoA = a.label.includes('Auto-import');
+          const isAutoB = b.label.includes('Auto-import');
+          if (isAutoA && !isAutoB) return 1;
+          if (!isAutoA && isAutoB) return -1;
+
+          // Tier 3: Category-based priority
+          const typePriority = {
+            function: 900,
+            method: 900,
+            variable: 800,
+            parameter: 800,
+            property: 800,
+            field: 800,
+            constant: 800,
+            class: 700,
+            interface: 700,
+            type: 700,
+            module: 600,
+            snippet: 500
+          };
+
+          const prioA = typePriority[a.type] || 0;
+          const prioB = typePriority[b.type] || 0;
+
+          if (prioA !== prioB) return prioB - prioA;
+
+          // Tier 4: Use LSP boost, then label alpha
+          return (b.boost || 0) - (a.boost || 0) || a.label.localeCompare(b.label);
+        }
+      }),
       search({ top: true }),
       keymap.of([...searchKeymap, ...defaultKeymap, ...historyKeymap, indentWithTab]),
       langExt,

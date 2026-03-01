@@ -5,17 +5,39 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::process::Command;
 use tokio_tungstenite::accept_async;
 use tokio_tungstenite::tungstenite::Message;
+use tauri::{AppHandle, Manager, path::BaseDirectory};
+use std::path::Path;
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
 
-pub async fn start_lsp_server() -> Result<u16, String> {
+pub fn is_node_installed() -> bool {
+    let mut cmd = std::process::Command::new("node");
+    cmd.arg("--version");
+    
+    #[cfg(windows)]
+    cmd.creation_flags(0x08000000);
+    
+    match cmd.output() {
+        Ok(output) => output.status.success(),
+        Err(_) => false,
+    }
+}
+
+pub async fn start_lsp_server(app: AppHandle) -> Result<u16, String> {
     let listener = TcpListener::bind("127.0.0.1:0").await.map_err(|e| e.to_string())?;
     let port = listener.local_addr().unwrap().port();
     println!("LSP server listening on 127.0.0.1:{}", port);
 
+    let pyright_res = app.path()
+        .resolve("resources/pyright/pyright-langserver.js", BaseDirectory::Resource)
+        .map_err(|e| format!("Failed to resolve pyright resource: {}", e))?;
+    
+    let pyright_path = pyright_res.to_string_lossy().to_string();
 
     tokio::spawn(async move {
         loop {
             if let Ok((stream, _)) = listener.accept().await {
-                tokio::spawn(handle_connection(stream));
+                tokio::spawn(handle_connection(stream, pyright_path.clone()));
             }
         }
     });
@@ -23,7 +45,7 @@ pub async fn start_lsp_server() -> Result<u16, String> {
     Ok(port)
 }
 
-async fn handle_connection(stream: TcpStream) {
+async fn handle_connection(stream: TcpStream, pyright_path: String) {
     let ws_stream = match accept_async(stream).await {
         Ok(ws) => ws,
         Err(e) => {
@@ -37,7 +59,14 @@ async fn handle_connection(stream: TcpStream) {
 
     // Start pyright
     let mut cmd = Command::new("node");
-    cmd.args(&["../node_modules/pyright/dist/pyright-langserver.js", "--stdio"]);
+    cmd.args(&[pyright_path.clone(), "--stdio".to_string()]);
+
+    if let Some(dir) = Path::new(&pyright_path).parent() {
+        cmd.current_dir(dir);
+    }
+
+    #[cfg(windows)]
+    cmd.as_std_mut().creation_flags(0x08000000); // CREATE_NO_WINDOW
 
     cmd.stdin(Stdio::piped())
         .stdout(Stdio::piped())

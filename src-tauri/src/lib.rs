@@ -217,14 +217,17 @@ fn notify_live_server(state: tauri::State<'_, AppState>) {
 }
 
 #[tauri::command]
-async fn get_lsp_port(state: tauri::State<'_, AppState>) -> Result<u16, String> {
+async fn get_lsp_port(app: tauri::AppHandle, state: tauri::State<'_, AppState>) -> Result<u16, String> {
+    if !lsp::is_node_installed() {
+        return Err("Node.js is not installed".to_string());
+    }
     {
         let port_guard = state.lsp_port.lock().unwrap();
         if let Some(p) = *port_guard {
             return Ok(p);
         }
     }
-    let p = lsp::start_lsp_server().await?;
+    let p = lsp::start_lsp_server(app).await?;
     let mut port_guard = state.lsp_port.lock().unwrap();
     *port_guard = Some(p);
     Ok(p)

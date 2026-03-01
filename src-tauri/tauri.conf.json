@@ -37,6 +37,12 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
+    ],
+    "resources": [
+      "resources/pyright/pyright-langserver.js",
+      "resources/pyright/pyright-internal.js",
+      "resources/pyright/vendor.js",
+      "resources/pyright/typeshed-fallback/stdlib/**/*"
     ]
   }
 }
