@@ -6,7 +6,9 @@
   "author": "Adyanth",
   "type": "module",
   "scripts": {
+    "predev": "node scripts/copy-pyright.js",
     "dev": "vite",
+    "prebuild": "node scripts/copy-pyright.js",
     "build": "vite build",
     "preview": "vite preview",
     "tauri": "tauri",
