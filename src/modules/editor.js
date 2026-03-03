@@ -4,6 +4,17 @@ import {
   highlightActiveLine, highlightActiveLineGutter, drawSelection,
 } from '@codemirror/view';
 import { defaultKeymap, indentWithTab, history, historyKeymap } from '@codemirror/commands';
+import { expandAbbreviation } from '@emmetio/codemirror6-plugin';
+
+// Extensions for which Emmet Tab-expansion is allowed.
+// In every other language, Tab falls through to normal indentation.
+const EMMET_EXTS = new Set(['html', 'htm', 'css', 'scss', 'less', 'jsx', 'tsx', 'vue', 'php']);
+
+function emmetExpand(view) {
+  const ext = state.currentFile?.split('.').pop()?.toLowerCase();
+  if (!EMMET_EXTS.has(ext)) return false;
+  return expandAbbreviation(view);
+}
 import { oneDark } from '@codemirror/theme-one-dark';
 import { autocompletion } from '@codemirror/autocomplete';
 import { searchKeymap, search } from '@codemirror/search';
@@ -61,7 +72,14 @@ export function createEditorState(content, langExt = []) {
         }
       }),
       search({ top: true }),
-      keymap.of([...searchKeymap, ...defaultKeymap, ...historyKeymap, indentWithTab]),
+      keymap.of([
+        // Emmet expands first on Tab; falls through to indentWithTab if not in an abbreviation
+        { key: 'Tab', run: emmetExpand },
+        ...searchKeymap,
+        ...defaultKeymap,
+        ...historyKeymap,
+        indentWithTab,
+      ]),
       langExt,
       oneDark,
       EditorView.lineWrapping,

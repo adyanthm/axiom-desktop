@@ -13,7 +13,7 @@
 <br/>
 
 [![Stars](https://img.shields.io/github/stars/adyanthm/axiom-desktop?style=for-the-badge&color=528bff&labelColor=1a1d23)](https://github.com/adyanthm/axiom-desktop)
-[![Version](https://img.shields.io/badge/version-0.1.2-528bff?style=for-the-badge&labelColor=1a1d23)](https://github.com/adyanthm/axiom-desktop)
+[![Version](https://img.shields.io/badge/version-0.1.4-528bff?style=for-the-badge&labelColor=1a1d23)](https://github.com/adyanthm/axiom-desktop)
 [![License](https://img.shields.io/badge/license-MIT-98c379?style=for-the-badge&labelColor=1a1d23)](./LICENSE.md)
 [![FOSS](https://img.shields.io/badge/FOSS-100%25-56b6c2?style=for-the-badge&labelColor=1a1d23)](#-free--open-source-software)
 [![Built With](https://img.shields.io/badge/backend-Rust%20%2B%20Tauri-e06c75?style=for-the-badge&labelColor=1a1d23)](https://tauri.app/)
@@ -119,7 +119,7 @@ Axiom includes a built-in, lightning-fast **Live Server** for web development. N
 
 ### 🌍 Multi-Language Support
 
-Axiom is **not** a single-language editor. It ships with built-in syntax highlighting, language detection, and autocomplete for **14 languages** out of the box:
+Axiom is **not** a single-language editor. It ships with built-in syntax highlighting, language detection, and autocomplete for **17 languages** out of the box:
 
 | Language | Extensions | Language | Extensions |
 |---|---|---|---|
@@ -127,11 +127,36 @@ Axiom is **not** a single-language editor. It ships with built-in syntax highlig
 | **JavaScript** | `.js` | **TypeScript** | `.ts` |
 | **JSX** | `.jsx` | **TSX** | `.tsx` |
 | **HTML** | `.html`, `.htm` | **CSS** | `.css` |
+| **SCSS** | `.scss` | **Less** | `.less` |
 | **JSON** | `.json` | **Markdown** | `.md` |
 | **C** | `.c`, `.h` | **C++** | `.cpp`, `.cc`, `.cxx` |
 | **Java** | `.java` | **PHP** | `.php` |
+| **Vue** | `.vue` | | |
 
 Languages are **lazy-loaded** — only the parser for the file you open gets imported. Zero wasted resources.
+
+---
+
+### ⚡ Emmet Abbreviation Expansion
+
+Axiom ships with [Emmet](https://emmet.io/) support — the industry-standard toolkit for writing HTML and CSS blazing fast using short abbreviations that expand into full markup on `Tab`.
+
+| Action | How |
+|---|---|
+| **Expand abbreviation** | Type any Emmet shorthand and press `Tab` |
+| **Visual tracker** | Emmet highlights and previews the abbreviation as you type |
+| **Scoped to markup/style languages** | Only active in `.html`, `.htm`, `.css`, `.scss`, `.less`, `.jsx`, `.tsx`, `.vue`, `.php` |
+
+**Examples:**
+
+| You type | After `Tab` |
+|---|---|
+| `div.container>ul>li*3` | Full nested `<div>` → `<ul>` → 3 `<li>` elements |
+| `a[href=#]` | `<a href="#"></a>` |
+| `m10` (in CSS) | `margin: 10px;` |
+| `bgc:#fff` (in CSS) | `background-color: #fff;` |
+
+In all other languages (Python, Rust, JS, etc.) `Tab` behaves as normal indentation — Emmet never fires.
 
 ---
 
@@ -324,7 +349,8 @@ npm run dev
 | **Native Backend** | [Rust](https://www.rust-lang.org/) + [Tauri 2](https://tauri.app/) |
 | **Terminal PTY** | [`portable-pty`](https://docs.rs/portable-pty) (Rust) + [xterm.js](https://xtermjs.org/) |
 | **Editor Core** | [CodeMirror 6](https://codemirror.net/) |
-| **Language Support** | `@codemirror/lang-*` (14 languages) |
+| **Language Support** | `@codemirror/lang-*` (17 languages) |
+| **Emmet** | [`@emmetio/codemirror6-plugin`](https://github.com/emmetio/codemirror6-plugin) |
 | **Theme** | One Dark Pro (custom variant) |
 | **Autocomplete** | `@codemirror/autocomplete` |
 | **Search** | `@codemirror/search` |

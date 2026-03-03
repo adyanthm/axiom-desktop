@@ -2,12 +2,9 @@
 // Languages are only downloaded when a file with that extension is first opened.
 
 const languageRegistry = {
+  // ── Plain languages (no Emmet) ──────────────────────────────────
   js:   () => import('@codemirror/lang-javascript').then(m => m.javascript()),
   ts:   () => import('@codemirror/lang-javascript').then(m => m.javascript({ typescript: true })),
-  jsx:  () => import('@codemirror/lang-javascript').then(m => m.javascript({ jsx: true })),
-  tsx:  () => import('@codemirror/lang-javascript').then(m => m.javascript({ jsx: true, typescript: true })),
-  html: () => import('@codemirror/lang-html').then(m => m.html()),
-  css:  () => import('@codemirror/lang-css').then(m => m.css()),
   json: () => import('@codemirror/lang-json').then(m => m.json()),
   md:   () => import('@codemirror/lang-markdown').then(m => m.markdown()),
   py:   () => Promise.all([import('@codemirror/lang-python'), import('@codemirror/language')]).then(([m, l]) => new l.LanguageSupport(m.pythonLanguage, [])),
@@ -15,7 +12,65 @@ const languageRegistry = {
   cpp:  () => import('@codemirror/lang-cpp').then(m => m.cpp()),
   c:    () => import('@codemirror/lang-cpp').then(m => m.cpp()),
   java: () => import('@codemirror/lang-java').then(m => m.java()),
-  php:  () => import('@codemirror/lang-php').then(m => m.php()),
+
+  // ── Emmet-enabled languages ──────────────────────────────────────
+  html: () => Promise.all([
+    import('@codemirror/lang-html'),
+    import('@emmetio/codemirror6-plugin'),
+  ]).then(([htmlMod, emmetMod]) => [
+    htmlMod.html(),
+    emmetMod.abbreviationTracker({ syntax: 'html' }),
+  ]),
+  htm:  () => languageRegistry.html(),
+  vue:  () => Promise.all([
+    import('@codemirror/lang-html'),
+    import('@emmetio/codemirror6-plugin'),
+  ]).then(([htmlMod, emmetMod]) => [
+    htmlMod.html(),
+    emmetMod.abbreviationTracker({ syntax: 'html' }),
+  ]),
+  php:  () => Promise.all([
+    import('@codemirror/lang-php'),
+    import('@emmetio/codemirror6-plugin'),
+  ]).then(([phpMod, emmetMod]) => [
+    phpMod.php(),
+    emmetMod.abbreviationTracker({ syntax: 'html' }),
+  ]),
+  css:  () => Promise.all([
+    import('@codemirror/lang-css'),
+    import('@emmetio/codemirror6-plugin'),
+  ]).then(([cssMod, emmetMod]) => [
+    cssMod.css(),
+    emmetMod.abbreviationTracker({ syntax: 'css' }),
+  ]),
+  scss: () => Promise.all([
+    import('@codemirror/lang-css'),
+    import('@emmetio/codemirror6-plugin'),
+  ]).then(([cssMod, emmetMod]) => [
+    cssMod.css(),
+    emmetMod.abbreviationTracker({ syntax: 'scss' }),
+  ]),
+  less: () => Promise.all([
+    import('@codemirror/lang-css'),
+    import('@emmetio/codemirror6-plugin'),
+  ]).then(([cssMod, emmetMod]) => [
+    cssMod.css(),
+    emmetMod.abbreviationTracker({ syntax: 'less' }),
+  ]),
+  jsx:  () => Promise.all([
+    import('@codemirror/lang-javascript'),
+    import('@emmetio/codemirror6-plugin'),
+  ]).then(([jsMod, emmetMod]) => [
+    jsMod.javascript({ jsx: true }),
+    emmetMod.abbreviationTracker({ syntax: 'jsx' }),
+  ]),
+  tsx:  () => Promise.all([
+    import('@codemirror/lang-javascript'),
+    import('@emmetio/codemirror6-plugin'),
+  ]).then(([jsMod, emmetMod]) => [
+    jsMod.javascript({ jsx: true, typescript: true }),
+    emmetMod.abbreviationTracker({ syntax: 'jsx' }),
+  ]),
 };
 
 // Cache already-loaded extensions so we never fetch the same language twice

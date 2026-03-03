@@ -32,6 +32,7 @@ This document covers everything you need to know to get from "I want to contribu
    - [Frontend → Backend Communication](#frontend--backend-communication)
    - [Terminal Architecture](#terminal-architecture)
    - [Language Support System](#language-support-system)
+   - [Emmet Integration](#emmet-integration)
    - [Visual Effects System](#visual-effects-system)
    - [Command Palette System](#command-palette-system)
    - [Keybindings System](#keybindings-system)
@@ -432,22 +433,58 @@ PTY output → Rust reader thread → emit('terminal-output') → xterm.js write
 
 ### Language Support System
 
-Languages are registered in `src/modules/languages.js`. Each entry maps a file extension to a lazy-loaded CodeMirror language package:
+Languages are registered in `src/modules/languages.js`. Each entry maps a file extension to a lazy-loaded CodeMirror language package. Languages are split into two groups: plain languages (no Emmet) and Emmet-enabled languages:
 
 ```javascript
 const languageRegistry = {
+  // Plain (no Emmet)
   js:   () => import('@codemirror/lang-javascript').then(m => m.javascript()),
   py:   () => import('@codemirror/lang-python').then(m => m.python()),
   rs:   () => import('@codemirror/lang-rust').then(m => m.rust()),
-  // ... 14 total
+
+  // Emmet-enabled (loads abbreviationTracker alongside the language)
+  html: () => Promise.all([
+    import('@codemirror/lang-html'),
+    import('@emmetio/codemirror6-plugin'),
+  ]).then(([m, e]) => [m.html(), e.abbreviationTracker({ syntax: 'html' })]),
+  css:  () => Promise.all([ /* ... */ ]),
+  // ... 17 total
 };
 ```
 
 **To add a new language:**
 1. `npm install @codemirror/lang-yourlang`
 2. Add an entry to `languageRegistry` in `languages.js`
-3. Add the file extension(s) to the icon map map in `src/modules/icons.js`
+   - If it's a markup/style language and should support Emmet, use `Promise.all` to also load `abbreviationTracker` from `@emmetio/codemirror6-plugin`
+   - Add the extension to the `EMMET_EXTS` set in `src/modules/editor.js` so the Tab key activates Emmet
+3. Add the file extension(s) to the icon map in `src/modules/icons.js`
 4. Add the extension to the file open dialog filter in `src/modules/files.js`
+
+---
+
+### Emmet Integration
+
+Emmet abbreviation expansion (`Tab` key) is powered by `@emmetio/codemirror6-plugin`. The integration has two parts:
+
+**1. Per-language tracker** (`src/modules/languages.js`)  
+For Emmet-enabled languages (HTML, CSS, SCSS, Less, JSX, TSX, Vue, PHP), each `languageRegistry` entry loads both the language extension and `abbreviationTracker()` from the plugin. The tracker provides the live visual underline and expansion preview as you type.
+
+**2. Global Tab guard** (`src/modules/editor.js`)  
+A custom `emmetExpand` function wraps `expandAbbreviation`. It checks the current file extension against `EMMET_EXTS`:
+```javascript
+const EMMET_EXTS = new Set(['html', 'htm', 'css', 'scss', 'less', 'jsx', 'tsx', 'vue', 'php']);
+
+function emmetExpand(view) {
+  const ext = state.currentFile?.split('.').pop()?.toLowerCase();
+  if (!EMMET_EXTS.has(ext)) return false; // fall through to indentWithTab
+  return expandAbbreviation(view);
+}
+```
+This ensures `Tab` **only** triggers Emmet for supported file types. In Python, Rust, plain JS, and all other files, `Tab` indents as normal.
+
+**To add Emmet support to a new language:**
+1. Add `abbreviationTracker({ syntax: 'your-syntax' })` to its `languageRegistry` entry.
+2. Add the extension to the `EMMET_EXTS` set in `editor.js`.
 
 ### Visual Effects System
 
@@ -515,6 +552,11 @@ When submitting a PR, verify the following still work:
 - [ ] Each effect toggles independently
 - [ ] Enabling one disables the others
 - [ ] No performance degradation
+
+**Emmet:**
+- [ ] Open an `.html` file → type `div.wrapper>p*2` and press `Tab` → expands correctly
+- [ ] Open a `.css` file → type `m10` and press `Tab` → expands to `margin: 10px;`
+- [ ] Open a `.py` file → type `if` and press `Tab` → normal indentation (Emmet does NOT fire)
 
 **Keybindings:**
 - [ ] `Ctrl+K Ctrl+S` → settings panel opens
