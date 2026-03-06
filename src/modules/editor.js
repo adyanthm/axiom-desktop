@@ -20,10 +20,39 @@ import { autocompletion } from '@codemirror/autocomplete';
 import { searchKeymap, search } from '@codemirror/search';
 import { state } from './state.js';
 
+// ── Dirty-version tracking ───────────────────────────────────────────────────
+// Maps filePath → the doc.version (integer) at the time the file was last
+// saved to or freshly loaded from disk.  A file is "clean" iff its current
+// doc.version equals the stored clean version.  No string comparison ever
+// occurs — this runs in O(1) with zero allocations on every keystroke.
+const cleanVersions = new Map();
+
+// Call this immediately after a file is saved OR freshly loaded so that
+// the current document version becomes the new "clean" baseline.
+export function markClean(filePath, docVersion) {
+  cleanVersions.set(filePath, docVersion);
+  state.dirtyFiles.delete(filePath);
+}
+
+// Returns the stored clean version for a path, or -1 if unknown.
+export function getCleanVersion(filePath) {
+  return cleanVersions.get(filePath) ?? -1;
+}
+
+// Remove tracking when a tab is closed (prevents map from growing forever).
+export function forgetCleanVersion(filePath) {
+  cleanVersions.delete(filePath);
+}
+
 // ── Editor State Factory ─────────────────────────────────────────────────────
 // Creates a fresh CodeMirror EditorState for a given document + language extension.
 // The updateListener handles the dirty-flag logic so the tab/explorer dot stays
 // in sync without a full re-render on every keystroke.
+//
+// Dirty detection uses transaction tracking (O(1) integer comparison):
+//   • markClean(path, version) is called on file-open and file-save.
+//   • Every update compares update.state.doc.version against that baseline.
+//   • No doc.toString() is ever called for dirty detection.
 export function createEditorState(content, langExt = []) {
   return EditorState.create({
     doc: content,
@@ -85,9 +114,13 @@ export function createEditorState(content, langExt = []) {
       EditorView.lineWrapping,
       EditorView.updateListener.of((update) => {
         if (update.docChanged && state.currentFile) {
-          const newContent   = update.state.doc.toString();
-          const savedContent = state.fileContents.get(state.currentFile) ?? '';
-          const isDirtyNow   = newContent !== savedContent;
+          // ── Transaction-tracking dirty check (O(1), zero allocations) ────
+          // doc.version is a monotonically-increasing integer maintained by
+          // CodeMirror internally. We simply compare it to the version we
+          // recorded when the file was last saved/loaded — no string work at all.
+          const currentVersion = update.state.doc.version;
+          const cleanVersion   = cleanVersions.get(state.currentFile) ?? -1;
+          const isDirtyNow     = currentVersion !== cleanVersion;
 
           if (isDirtyNow && !state.dirtyFiles.has(state.currentFile)) {
             state.dirtyFiles.add(state.currentFile);

@@ -2,7 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { open as dialogOpen } from '@tauri-apps/plugin-dialog';
 import { state, IS_TAURI } from './state.js';
 import { pathBasename, pathDirname } from './utils.js';
-import { view, createEditorState } from './editor.js';
+import { view, createEditorState, markClean, forgetCleanVersion } from './editor.js';
 import { getLanguageExtension, getLspExtension } from './languages.js';
 import { renderTabs, patchTabDirty } from './tabs.js';
 import { updateBreadcrumb } from './breadcrumb.js';
@@ -45,9 +45,14 @@ export async function openFile(filePath, focusEditor = true) {
     const ext     = filePath.split('.').pop();
     const langExt = await getLanguageExtension(ext);
     const lspExt  = await getLspExtension(filePath);
-    
+
     // Combine base language highlighting with LSP features
-    state.fileEditorStates.set(filePath, createEditorState(content, [langExt, lspExt]));
+    const editorState = createEditorState(content, [langExt, lspExt]);
+    state.fileEditorStates.set(filePath, editorState);
+
+    // Record the fresh doc version as the "clean" baseline so the dirty
+    // check starts from zero allocations on the very first keystroke.
+    markClean(filePath, editorState.doc.version);
   }
 
   if (!state.openTabs.includes(filePath)) state.openTabs.push(filePath);
@@ -88,6 +93,7 @@ export async function closeTab(filePath) {
   state.openTabs = state.openTabs.filter(f => f !== filePath);
   state.fileEditorStates.delete(filePath);
   state.fileContents.delete(filePath); // aggressively free memory
+  forgetCleanVersion(filePath);         // drop the clean-version entry
 
   if (filePath === state.currentFile) {
     if (state.openTabs.length > 0) {
@@ -125,7 +131,15 @@ export async function saveFile(filePath) {
     return;
   }
   state.fileContents.set(fp, content);
-  state.dirtyFiles.delete(fp);
+
+  // After a successful write, stamp the current doc version as the new
+  // "clean" baseline. This clears the dirty flag and resets the transaction
+  // counter so subsequent keystrokes are measured from this point forward.
+  const currentDocVersion = fp === state.currentFile
+    ? view.state.doc.version
+    : (state.fileEditorStates.get(fp)?.doc.version ?? 0);
+  markClean(fp, currentDocVersion);
+
   patchTabDirty(fp);
   import('./explorer.js').then(m => m.patchExplorerDirty(fp));
 
