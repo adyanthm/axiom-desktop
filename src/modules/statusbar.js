@@ -65,8 +65,18 @@ export function updateStatus() {
   const line = view.state.doc.lineAt(sel.head);
   const col  = sel.head - line.from + 1;
   if (cursorEl) cursorEl.textContent = `Ln ${line.number}, Col ${col}`;
-  const txt = view.state.doc.toString();
-  if (wordsEl) wordsEl.textContent = `${txt.trim() === '' ? 0 : txt.trim().split(/\s+/).length} words`;
+  
+  // ── Word count (Optimized) ──────────────────────────────────────────────
+  // Avoid doc.toString() on massive files as it flattens the rope and freezes the UI.
+  if (wordsEl) {
+    const docLen = view.state.doc.length;
+    if (docLen > 50_000) {
+      wordsEl.textContent = 'Too large to count words';
+    } else {
+      const txt = view.state.doc.toString();
+      wordsEl.textContent = `${txt.trim() === '' ? 0 : txt.trim().split(/\s+/).length} words`;
+    }
+  }
 
   // ── LSP status ──────────────────────────────────────────────────────────
   const lspStatusEl = document.getElementById('sb-lsp-status');
