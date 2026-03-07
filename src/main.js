@@ -12,6 +12,8 @@ import './modules/runner.js';
 import './modules/commands.js';
 import './modules/menubar.js';
 import './modules/contextmenu.js';
+import { initZoom } from './modules/zoom.js';
+initZoom();
 
 // ── Sidebar Resizer ──────────────────────────────────────────────────────────
 const resizer = document.getElementById('resizer');

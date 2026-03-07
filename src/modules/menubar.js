@@ -110,6 +110,13 @@ window.addEventListener('keydown', async e => {
   if (ctrl &&  shift && !alt && k === 'p') { e.preventDefault(); togglePalette(false, 'command'); return; }
   if (ctrl && !shift && !alt && k === 'o') { e.preventDefault(); openSingleFile(); return; }
 
+  // Tab cycling
+  if (ctrl && !alt && k === 'tab') {
+    e.preventDefault();
+    import('./tabs.js').then(m => m.cycleTab(shift ? -1 : 1));
+    return;
+  }
+
   // Ctrl+K sequences (VS Code style)
   if (ctrl && !shift && !alt && k === 'k') { e.preventDefault(); ctrlKPending = true; return; }
   if (ctrlKPending) {

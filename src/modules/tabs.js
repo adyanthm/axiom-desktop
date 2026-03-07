@@ -59,3 +59,16 @@ export function patchTabDirty(fp) {
     ? '<span class="tab-dot">●</span>'
     : '<i class="fa-solid fa-xmark"></i>';
 }
+
+// ── Tab Navigation ────────────────────────────────────────────────────────────
+export function cycleTab(direction = 1) {
+  if (state.openTabs.length < 2) return;
+  const currentIndex = state.openTabs.indexOf(state.currentFile);
+  if (currentIndex === -1) return; // shouldn't happen while a file is active
+  
+  let nextIndex = (currentIndex + direction) % state.openTabs.length;
+  if (nextIndex < 0) nextIndex = state.openTabs.length - 1;
+  
+  const nextFile = state.openTabs[nextIndex];
+  import('./files.js').then(m => m.openFile(nextFile));
+}

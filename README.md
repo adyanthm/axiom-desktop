@@ -13,7 +13,7 @@
 <br/>
 
 [![Stars](https://img.shields.io/github/stars/adyanthm/axiom-desktop?style=for-the-badge&color=528bff&labelColor=1a1d23)](https://github.com/adyanthm/axiom-desktop)
-[![Version](https://img.shields.io/badge/version-0.1.4-528bff?style=for-the-badge&labelColor=1a1d23)](https://github.com/adyanthm/axiom-desktop)
+[![Version](https://img.shields.io/badge/version-0.1.7-528bff?style=for-the-badge&labelColor=1a1d23)](https://github.com/adyanthm/axiom-desktop)
 [![License](https://img.shields.io/badge/license-MIT-98c379?style=for-the-badge&labelColor=1a1d23)](./LICENSE.md)
 [![FOSS](https://img.shields.io/badge/FOSS-100%25-56b6c2?style=for-the-badge&labelColor=1a1d23)](#-free--open-source-software)
 [![Built With](https://img.shields.io/badge/backend-Rust%20%2B%20Tauri-e06c75?style=for-the-badge&labelColor=1a1d23)](https://tauri.app/)
@@ -77,7 +77,7 @@ The frontend is powered by [CodeMirror 6](https://codemirror.net/), one of the f
 | **Source Code** | 🟢 **Fully FOSS (MIT)** | Partially open (proprietary builds) |
 | **Runtime Overhead** | Lean native webview | Full Chromium browser engine |
 
-On a **150,000-line codebase**, Axiom uses just **~140 MB of RAM** — compared to VS Code's **~2 GB**. That's a **14× reduction**. And because the backend is Rust — not JavaScript running on Node.js — file operations, directory scanning, and terminal I/O happen at **native speed** with zero garbage collection pauses.
+On a **150,000-line codebase**, Axiom uses just **~140 MB of RAM** — compared to VS Code's **~2 GB**. That's a **14× reduction**. And because the backend is Rust — not JavaScript running on Node.js — file operations, directory scanning, and terminal I/O happen at **native speed** with zero garbage collection pauses. Furthermore, Axiom processes multi-megabyte files smoothly by debouncing expensive structural calculations and virtually truncating ultra-long lines to prevent browser thread freeze.
 
 ---
 
@@ -188,6 +188,8 @@ Axiom ships with a unique set of editor visual effects that make your coding ses
 | **RGB Glow** | `Ctrl+Alt+R` | Animated, cycling RGB glow that moves through the spectrum |
 | **RGB Text** | `Ctrl+Alt+T` | Applies animated rainbow colors to your editor text |
 | **300% Zoom Tracking** | `Ctrl+Alt+Z` | Intelligently zooms in 3× around your caret — no manual panning |
+| **Editor Zoom** | `Ctrl` + `+`/`-`/`0` or `Scroll` | Native font-size scaling for code — glyphs re-rasterise to stay razor-sharp |
+| **UI Scale** | `Ctrl+Shift` + `+`/`-`/`0` | Scales the entire IDE interface (Sidebar, Menus, Dialogs) via CSS constraints perfectly |
 
 All effects are **mutually exclusive** and toggle-able at any time with zero performance overhead.
 
@@ -219,6 +221,7 @@ Access it via `Ctrl+K, Ctrl+S` or **View → Keyboard Shortcuts**.
 | Open Folder | `Ctrl+K Ctrl+O` |
 | Command Palette | `Ctrl+Shift+P` |
 | Go to File | `Ctrl+P` |
+| Next / Previous Tab | `Ctrl+Tab` / `Ctrl+Shift+Tab` |
 | Toggle Terminal | `` Ctrl+Shift+` `` |
 | Run File | `F5` / `Ctrl+Shift+R` |
 | Keyboard Shortcuts | `Ctrl+K Ctrl+S` |
@@ -227,7 +230,11 @@ Access it via `Ctrl+K, Ctrl+S` or **View → Keyboard Shortcuts**.
 | Toggle Neon Glow | `Ctrl+Alt+G` |
 | Toggle RGB Glow | `Ctrl+Alt+R` |
 | Toggle RGB Text | `Ctrl+Alt+T` |
-| Toggle 300% Zoom | `Ctrl+Alt+Z` |
+| Toggle 300% Zoom Tracking | `Ctrl+Alt+Z` |
+| Zoom In/Out (Editor Font) | `Ctrl+=` / `Ctrl+-` |
+| Reset Zoom (Editor Font) | `Ctrl+0` |
+| Scale Up/Down UI | `Ctrl+Shift+=` / `Ctrl+Shift+-` |
+| Reset UI Scale | `Ctrl+Shift+0` |
 | Change Live Server Port | (Command Palette) |
 | Undo / Redo | `Ctrl+Z` / `Ctrl+Y` |
 
@@ -282,6 +289,7 @@ Axiom is engineered for performance at every layer:
 | **File System** | Direct `std::fs` calls — zero serialization, zero IPC translation layers |
 | **Terminal** | Native PTY via `portable-pty` — true OS-level process, not a JS wrapper |
 | **Editor Engine** | CodeMirror 6 — virtual rendering, incremental parsing, sub-ms updates |
+| **Large File Safety** | O(1) dirty checking via transaction tracking. Visual truncation for lines >10,000 chars preventing DOM hangs |
 | **Language Parsers** | Lazy-loaded on demand — only import what you actually use |
 | **Bundler** | Vite — sub-100ms hot reloads during development, tree-shaken production builds |
 | **Styling** | Pure CSS with custom properties — no runtime CSS-in-JS overhead |

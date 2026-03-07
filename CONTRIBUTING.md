@@ -94,6 +94,8 @@ axiom/
 │       ├── explorer.js        # File tree rendering UI
 │       ├── commands.js        # Fuzzy search and command execution
 │       ├── runner.js          # File execution and Live Server logic
+│       ├── zoom.js            # Editor font scaling & complete UI scaling mechanics
+│       ├── longLine.js        # Performance guard for truncated DOM rendering
 │       └── ...                # Other self-contained modules (tabs, etc)
 ├── src-tauri/
 │   ├── Cargo.toml             # Rust dependencies
@@ -496,6 +498,10 @@ Effects are toggled via CSS classes on `document.body`:
 
 All effect styles are defined in `style.css`. Effects are **mutually exclusive** — enabling one disables the others. This routing is handled inside `src/modules/effects.js`.
 
+**Scales and Zooming** (`src/modules/zoom.js`):
+- Editor font zooming works by updating `--cm-font-size` on the editor view and forcing a structural layout reset with `view.requestMeasure()`
+- Total UI scaling is handled by modifying the `zoom` CSS property directly on `document.body` instead of a CSS transformation. This causes full boundary reflow natively.
+
 ### Command Palette System
 
 The palette has two modes:
@@ -526,7 +532,10 @@ When submitting a PR, verify the following still work:
 - [ ] Edit → dirty indicator (●) appears on tab
 - [ ] Save (`Ctrl+S`) → indicator clears
 - [ ] Multiple tabs → switching preserves state
+- [ ] Tab Cycling → `Ctrl+Tab` or `Ctrl+Shift+Tab` cycles between tabs iteratively
 - [ ] Close tab (`Ctrl+W`) → prompts to save if dirty
+- [ ] Editor Zoom → `Ctrl+Scroll` resizes text whilst line numbers sync perfectly
+- [ ] UI Zoom → `Ctrl+Shift+Plus` scales everything without hiding the status bar
 
 **File Operations:**
 - [ ] Create new file (via explorer toolbar, context menu, or `Ctrl+N`)

@@ -19,10 +19,18 @@ export const keybindings = [
   { id: 'workbench.save',            command: 'Save',                       keys: 'Ctrl+S',          source: 'Default' },
   { id: 'workbench.openFolder',      command: 'Open Folder',                keys: 'Ctrl+K Ctrl+O',   source: 'Default' },
   { id: 'workbench.openFile',        command: 'Open File',                  keys: 'Ctrl+O',          source: 'Default' },
+  { id: 'workbench.nextTab',         command: 'Next File Tab',              keys: 'Ctrl+Tab',        source: 'Default' },
+  { id: 'workbench.prevTab',         command: 'Previous File Tab',          keys: 'Ctrl+Shift+Tab',  source: 'Default' },
   { id: 'preferences.glow',          command: 'Toggle Neon Glow',           keys: 'Ctrl+Alt+G',      source: 'Default' },
   { id: 'preferences.rgbGlow',       command: 'Toggle RGB Glow',            keys: 'Ctrl+Alt+R',      source: 'Default' },
   { id: 'preferences.rgbText',       command: 'Toggle RGB Text',            keys: 'Ctrl+Alt+T',      source: 'Default' },
   { id: 'preferences.zoom',          command: 'Toggle 300% Zoom',           keys: 'Ctrl+Alt+Z',      source: 'Default' },
+  { id: 'view.zoomIn',               command: 'Zoom In (Editor)',           keys: 'Ctrl+=',          source: 'Default' },
+  { id: 'view.zoomOut',              command: 'Zoom Out (Editor)',          keys: 'Ctrl+-',          source: 'Default' },
+  { id: 'view.zoomReset',            command: 'Reset Zoom (Editor)',        keys: 'Ctrl+0',          source: 'Default' },
+  { id: 'view.uiZoomIn',             command: 'Scale Up UI',                keys: 'Ctrl+Shift+=',    source: 'Default' },
+  { id: 'view.uiZoomOut',            command: 'Scale Down UI',              keys: 'Ctrl+Shift+-',    source: 'Default' },
+  { id: 'view.uiZoomReset',          command: 'Reset UI Scale',             keys: 'Ctrl+Shift+0',    source: 'Default' },
   { id: 'liveserver.changePort',     command: 'Change Live Server Port',    keys: '',                source: 'Default' },
 ];
 

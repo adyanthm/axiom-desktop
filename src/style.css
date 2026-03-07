@@ -61,7 +61,7 @@ body {
 #app {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: 100%;
 }
 
 /* ── Menu Bar ── */
@@ -801,6 +801,8 @@ body {
   overflow: hidden;
   display: flex;
   user-select: auto;
+  /* Base font size — driven by zoom.js changing --cm-font-size */
+  --cm-font-size: 14px;
 }
 
 .cm-editor {
@@ -808,10 +810,19 @@ body {
   width: 100%;
   position: relative;
   font-family: "JetBrains Mono", "Fira Code", monospace;
-  font-size: 14px;
+  /* Driven by --cm-font-size CSS var so zoom.js can change it without
+     recreating the EditorState. Glyphs re-rasterise at the new size → sharp. */
+  font-size: var(--cm-font-size, 14px);
   line-height: 1.6;
   font-feature-settings: "liga" 1, "calt" 1;
   -webkit-font-smoothing: antialiased;
+}
+
+/* Gutters have their own font-size in CM's default CSS, override it here */
+.cm-editor .cm-gutters,
+.cm-editor .cm-lineNumbers,
+.cm-editor .cm-gutter {
+  font-size: var(--cm-font-size, 14px) !important;
 }
 
 .cm-editor,
@@ -888,6 +899,32 @@ body {
 
 #statusbar .sep {
   flex: 1;
+}
+
+/* Zoom level badge — only visible when zoom ≠ 100% */
+#sb-zoom {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent-color);
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(82, 139, 255, .1);
+  cursor: default;
+  user-select: none;
+  letter-spacing: .3px;
+}
+
+/* UI scale badge — amber so it's visually distinct from editor zoom (blue) */
+#sb-ui-scale {
+  font-size: 11px;
+  font-weight: 600;
+  color: #e5c07b;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(229, 192, 123, .1);
+  cursor: default;
+  user-select: none;
+  letter-spacing: .3px;
 }
 
 /* ── Context Menu ── */

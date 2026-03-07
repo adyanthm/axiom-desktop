@@ -20,7 +20,14 @@ const commands = [
   { id: 'new-file',                label: 'File: New File' },
   { id: 'new-folder',              label: 'File: New Folder' },
   { id: 'save-file',               label: 'File: Save' },
-
+  
+  // ── View / Scale Commands ──
+  { id: 'editor-zoom-in',          label: 'View: Zoom In (Editor Font)' },
+  { id: 'editor-zoom-out',         label: 'View: Zoom Out (Editor Font)' },
+  { id: 'editor-zoom-reset',       label: 'View: Reset Zoom (Editor Font)' },
+  { id: 'ui-scale-in',             label: 'View: Scale Up UI' },
+  { id: 'ui-scale-out',            label: 'View: Scale Down UI' },
+  { id: 'ui-scale-reset',          label: 'View: Reset UI Scale' },
 ];
 
 let filteredCmds = [];
@@ -137,6 +144,14 @@ export async function execCmd(id) {
     case 'toggle-rgb-glow': import('./effects.js').then(m => m.toggleRgbGlow()); break;
     case 'toggle-rgb-text': import('./effects.js').then(m => m.toggleRgbText()); break;
     case 'toggle-zoom':     import('./effects.js').then(m => m.toggleZoom()); break;
+
+    // Zoom & Scale
+    case 'editor-zoom-in':    import('./zoom.js').then(m => m.zoomIn()); break;
+    case 'editor-zoom-out':   import('./zoom.js').then(m => m.zoomOut()); break;
+    case 'editor-zoom-reset': import('./zoom.js').then(m => m.zoomReset()); break;
+    case 'ui-scale-in':       import('./zoom.js').then(m => m.uiZoomIn()); break;
+    case 'ui-scale-out':      import('./zoom.js').then(m => m.uiZoomOut()); break;
+    case 'ui-scale-reset':    import('./zoom.js').then(m => m.uiZoomReset()); break;
 
     case 'open-keybindings': import('./keymap.js').then(m => m.openKeymapSettings()); break;
 
