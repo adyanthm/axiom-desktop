@@ -1,6 +1,6 @@
 [package]
 name = "axiom-editor"
-version = "0.1.5"
+version = "0.1.6"
 description = "Blazing fast code editor with multi language support, and all other neccessary things"
 authors = ["Adyanth"]
 license = "MIT"

@@ -19,6 +19,7 @@ import { oneDark } from '@codemirror/theme-one-dark';
 import { autocompletion } from '@codemirror/autocomplete';
 import { searchKeymap, search } from '@codemirror/search';
 import { state } from './state.js';
+import { longLineExtension } from './longLine.js';
 
 // ── Dirty-version tracking ───────────────────────────────────────────────────
 // Maps filePath → the doc.version (integer) at the time the file was last
@@ -109,6 +110,7 @@ export function createEditorState(content, langExt = []) {
         ...historyKeymap,
         indentWithTab,
       ]),
+      longLineExtension,
       langExt,
       oneDark,
       EditorView.lineWrapping,

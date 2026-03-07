@@ -819,6 +819,58 @@ body {
   height: 100% !important;
 }
 
+/* ── Long-line guard (lines > 10 000 chars) ── */
+/* Wrapper keeps badge + button on one inline flow so they sit flush at the
+   truncation point without triggering any line-break. */
+.cm-ll-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+/* Info badge — muted, pill-shaped, non-interactive */
+.cm-ll-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  font-size: 11px;
+  font-style: normal;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, .05);
+  border: 1px solid var(--context-border);
+  user-select: none;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+/* "Load full line" button */
+.cm-ll-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  font-size: 11px;
+  color: var(--accent-color);
+  background: rgba(82, 139, 255, .08);
+  border: 1px solid rgba(82, 139, 255, .25);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  transition: background .12s, border-color .12s;
+}
+
+.cm-ll-btn:hover {
+  background: rgba(82, 139, 255, .18);
+  border-color: var(--accent-color);
+}
+
+
 /* ── Status Bar ── */
 #statusbar {
   height: 24px;
