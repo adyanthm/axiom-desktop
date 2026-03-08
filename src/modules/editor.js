@@ -18,6 +18,7 @@ function emmetExpand(view) {
 import { oneDark } from '@codemirror/theme-one-dark';
 import { autocompletion } from '@codemirror/autocomplete';
 import { searchKeymap, search } from '@codemirror/search';
+import { foldGutter, foldKeymap } from '@codemirror/language';
 import { state } from './state.js';
 import { longLineExtension } from './longLine.js';
 
@@ -62,6 +63,16 @@ export function createEditorState(content, langExt = []) {
       EditorState.allowMultipleSelections.of(true),
       drawSelection(),
       lineNumbers(),
+      foldGutter({
+        markerDOM: (open) => {
+          let el = document.createElement('span');
+          el.className = open ? 'cm-fold-open' : 'cm-fold-closed';
+          el.innerHTML = open 
+            ? '<i class="fa-solid fa-chevron-down"></i>' 
+            : '<i class="fa-solid fa-chevron-right"></i>';
+          return el;
+        }
+      }),
       highlightActiveLine(),
       highlightActiveLineGutter(),
       autocompletion({
@@ -108,6 +119,7 @@ export function createEditorState(content, langExt = []) {
         ...searchKeymap,
         ...defaultKeymap,
         ...historyKeymap,
+        ...foldKeymap,
         indentWithTab,
       ]),
       longLineExtension,

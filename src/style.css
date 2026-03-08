@@ -1954,3 +1954,44 @@ body.zoom-active .cm-editor {
   margin-bottom: 4px !important;
   line-height: 1.4 !important;
 }
+
+/* ── Code Folding VS Code Style ── */
+.cm-foldGutter {
+  width: 16px !important;
+}
+
+.cm-fold-open,
+.cm-fold-closed {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: var(--text-muted);
+  font-size: 10px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease-in-out;
+}
+
+/* Check when hovering the gutter block */
+.cm-gutters:hover .cm-fold-open,
+.cm-gutters:hover .cm-fold-closed {
+  opacity: 1 !important;
+}
+
+/* Always show collapsed folders even when not hovered */
+.cm-fold-closed {
+  opacity: 1 !important;
+}
+
+.cm-fold-open:hover,
+.cm-fold-closed:hover {
+  color: var(--text-active);
+}
+
+.cm-fold-open i,
+.cm-fold-closed i {
+  /* Offset tiny icons slightly to center perfectly */
+  margin-top: 1px;
+}
