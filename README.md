@@ -262,7 +262,7 @@ Axiom uses Rust's native `std::fs` via Tauri commands to read, write, and manage
 
 Axiom ships a **fully integrated Python debugger**, powered by [debugpy](https://github.com/microsoft/debugpy) and the [Debug Adapter Protocol (DAP)](https://microsoft.github.io/debug-adapter-protocol/). No extensions, no configuration files, no setup — just open a `.py` file and press `F5`.
 
-![Debugger Demo](./media/debugger.gif)
+![Debugger Demo](./media/debug.gif)
 
 | Feature | Details |
 |---|---|
