@@ -24,4 +24,4 @@ dist-ssr
 *.sw?
 
 # Tauri resources
-src-tauri/resources/
+src-tauri/resources/*/
