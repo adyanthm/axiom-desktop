@@ -42,7 +42,8 @@
       "resources/pyright/pyright-langserver.js",
       "resources/pyright/pyright-internal.js",
       "resources/pyright/vendor.js",
-      "resources/pyright/typeshed-fallback/stdlib/**/*"
+      "resources/pyright/typeshed-fallback/stdlib/**/*",
+      "resources/debugpy/**/*"
     ]
   }
 }

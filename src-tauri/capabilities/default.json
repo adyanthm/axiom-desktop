@@ -16,6 +16,7 @@
     "store:default",
     "shell:default",
     "shell:allow-open",
-    "window-state:default"
+    "window-state:default",
+    "core:window:allow-set-title"
   ]
 }

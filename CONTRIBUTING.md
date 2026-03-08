@@ -31,6 +31,7 @@ This document covers everything you need to know to get from "I want to contribu
 7. [Understanding the Codebase](#understanding-the-codebase)
    - [Frontend → Backend Communication](#frontend--backend-communication)
    - [Terminal Architecture](#terminal-architecture)
+   - [Debugger Architecture](#debugger-architecture)
    - [Language Support System](#language-support-system)
    - [Emmet Integration](#emmet-integration)
    - [Visual Effects System](#visual-effects-system)
@@ -57,10 +58,11 @@ Axiom is a **desktop application** built with:
 │                     Axiom IDE                             │
 │                                                           │
 │  ┌──────────────────────┐     ┌──────────────────────────┐│
-│  │   Frontend (JS)      │     │    Backend (Rust)         │
+│  │   Frontend (JS)      │     │    Backend (Rust)         ││
 │  │                      │     │                           │  
 │  │  • CodeMirror 6      │◄───►│  • File system (std::fs)  |  
 │  │  • xterm.js          │ IPC │  • Terminal (portable-pty)│  
+│  │  • Debug Panel (DAP) │     │  • DAP WebSocket bridge   │  
 │  │  • Command Palette   │     │  • Native dialogs         │  
 │  │  • File Explorer     │     │  • Persistent storage     │  
 │  │  • Visual Effects    │     │  • Window state           │  
@@ -89,6 +91,8 @@ axiom/
 │       ├── state.js           # Centralized global application state
 │       ├── editor.js          # CodeMirror instances and theming
 │       ├── terminal.js        # xterm.js integration and PTY sizing
+│       ├── debug.js           # DAP client — debug panel UI, variable editing
+│       ├── breakpoints.js     # CodeMirror gutter extension for breakpoints
 │       ├── fs.js              # Native filesystem commands
 │       ├── files.js           # File logic (open, save, drag-drop)
 │       ├── explorer.js        # File tree rendering UI
@@ -102,9 +106,13 @@ axiom/
 │   ├── tauri.conf.json        # Tauri app configuration
 │   ├── src/
 │   │   ├── main.rs            # Rust entry point
-│   │   └── lib.rs             # All Rust backend logic (~220 lines)
-│   │                          #   File ops, directory listing, terminal PTY,
-│   │                          #   resize handling, process management
+│   │   ├── lib.rs             # All Rust backend logic
+│   │   │                     #   File ops, directory listing, terminal PTY,
+│   │   │                     #   resize handling, process management
+│   │   ├── debug.rs           # DAP WebSocket bridge — spawns debugpy, bridges I/O
+│   │   └── lsp.rs             # LSP server bridge (Pyright)
+│   ├── resources/
+│   │   └── debugpy/           # Bundled debugpy distribution (pure Python)
 │   ├── icons/                 # App icons for all platforms
 │   └── capabilities/          # Tauri permission capabilities
 ├── public/
@@ -419,6 +427,8 @@ fn read_file_text(path: String) -> Result<String, String> {
 | `start_terminal` | Spawn a PTY terminal process | `cwd: Option<String>` |
 | `terminal_input` | Send input to the terminal | `input: String` |
 | `resize_terminal` | Resize the PTY | `rows: u16, cols: u16` |
+| `get_debug_port` | Start DAP WebSocket server, return port | *(none)* |
+| `start_lsp` | Start Pyright LSP server, return port | *(none)* |
 
 ### Terminal Architecture
 
@@ -433,7 +443,50 @@ User types → xterm.js onData → invoke('terminal_input') → Rust writer → 
 PTY output → Rust reader thread → emit('terminal-output') → xterm.js write
 ```
 
-### Language Support System
+### Debugger Architecture
+
+Axiom's Python debugger is built on the **Debug Adapter Protocol (DAP)** — the same standard used by VS Code. It connects to [debugpy](https://github.com/microsoft/debugpy), which is bundled in `src-tauri/resources/debugpy/` and requires only a standard Python installation at runtime.
+
+```
+User presses F5
+   │
+   ▼
+[Frontend] debug.js calls invoke('get_debug_port')
+   │
+   ▼
+[Rust] debug.rs binds a WebSocket server on a random port,
+       then spawns: python -m debugpy.adapter
+   │
+   ▼
+[Frontend] Opens WebSocket to ws://127.0.0.1:{port}
+   │
+   ▼
+[Rust] Bridges WebSocket ↔ debugpy stdin/stdout
+   │   (strips DAP HTTP-style headers, passes raw JSON)
+   ▼
+[Frontend] Sends DAP requests (initialize → launch → setBreakpoints → configurationDone)
+[Frontend] Receives DAP events (initialized, stopped, output, terminated…)
+   │
+   ▼
+On 'stopped': frontend requests stackTrace + scopes + variables
+              → render live in Variables and Call Stack tabs
+              → highlight active line in CodeMirror
+```
+
+**Key files:**
+
+| File | Role |
+|---|---|
+| `src-tauri/src/debug.rs` | Rust — WebSocket server, spawns debugpy, bridges stdio |
+| `src/modules/debug.js` | JS — DAP client, debug panel UI, variable editing |
+| `src/modules/breakpoints.js` | JS — CodeMirror gutter extension, breakpoint state, line highlighting |
+| `src-tauri/resources/debugpy/` | Bundled Python debugpy package |
+
+**To extend the debugger** (e.g., add watch expressions):
+1. Send a `evaluate` DAP request with the expression and `frameId` from the top stack frame.
+2. Display the result in a new `Watches` tab (following the pattern of the existing `Variables` tab).
+3. Call `evaluate` again after each `stopped` event to refresh watches automatically.
+
 
 Languages are registered in `src/modules/languages.js`. Each entry maps a file extension to a lazy-loaded CodeMirror language package. Languages are split into two groups: plain languages (no Emmet) and Emmet-enabled languages:
 
@@ -567,6 +620,19 @@ When submitting a PR, verify the following still work:
 - [ ] Open a `.css` file → type `m10` and press `Tab` → expands to `margin: 10px;`
 - [ ] Open a `.py` file → type `if` and press `Tab` → normal indentation (Emmet does NOT fire)
 
+**Python Debugger:**
+- [ ] Open a `.py` file → click gutter to place a red breakpoint dot
+- [ ] Press `F5` → debug panel slides in, status badge shows `RUNNING`
+- [ ] Execution pauses at breakpoint → status shows `PAUSED`, active line highlighted amber
+- [ ] Variables panel populates with local variable names, types, and values
+- [ ] Call Stack panel shows the current frame chain
+- [ ] Console tab shows `print()` output in real time
+- [ ] Double-click a variable value → inline input appears, press `Enter` to commit change
+- [ ] `F10` steps over, `F11` steps into, `Shift+F11` steps out
+- [ ] `Shift+F5` or clicking Stop → session ends, highlight clears, status shows `STOPPED`
+- [ ] Closing the panel mid-session clears the amber line highlight
+- [ ] Starting a second debug session resets the console and variable panels cleanly
+
 **Keybindings:**
 - [ ] `Ctrl+K Ctrl+S` → settings panel opens
 - [ ] Click pencil → edit mode activates
@@ -598,8 +664,8 @@ Axiom targets **all major desktop platforms**:
 
 These are things actively on the roadmap. PRs in these areas are especially encouraged:
 
-- **Language Server Protocol (LSP)** — planned, contributions welcome
 - **More language support** — add new CodeMirror language packages
+- **Debugger Watch Expressions** — `evaluate` DAP requests to track arbitrary expressions
 - **Multiple terminal tabs** — planned
 - **Split editor views** — planned
 - **Minimap** — planned

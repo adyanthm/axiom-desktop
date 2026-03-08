@@ -224,6 +224,11 @@ Access it via `Ctrl+K, Ctrl+S` or **View → Keyboard Shortcuts**.
 | Next / Previous Tab | `Ctrl+Tab` / `Ctrl+Shift+Tab` |
 | Toggle Terminal | `` Ctrl+Shift+` `` |
 | Run File | `F5` / `Ctrl+Shift+R` |
+| **Start / Continue Debugger** | **`F5`** (Python files) |
+| **Step Over** | **`F10`** |
+| **Step Into** | **`F11`** |
+| **Step Out** | **`Shift+F11`** |
+| **Stop Debugger** | **`Shift+F5`** |
 | Keyboard Shortcuts | `Ctrl+K Ctrl+S` |
 | Find | `Ctrl+F` |
 | Find & Replace | `Ctrl+H` |
@@ -253,15 +258,51 @@ Axiom uses Rust's native `std::fs` via Tauri commands to read, write, and manage
 
 ---
 
-### 🏃 Run Code Directly
+### 🐛 Python Debugger
+
+Axiom ships a **fully integrated Python debugger**, powered by [debugpy](https://github.com/microsoft/debugpy) and the [Debug Adapter Protocol (DAP)](https://microsoft.github.io/debug-adapter-protocol/). No extensions, no configuration files, no setup — just open a `.py` file and press `F5`.
+
+![Debugger Demo](./media/debugger.gif)
+
+| Feature | Details |
+|---|---|
+| **Start Debugging** | `F5` or the **Bug icon** (🐛) in the editor header |
+| **Breakpoints** | Click in the gutter (left of line numbers) to place or remove a red dot |
+| **Step Over** | `F10` — run the current line, stay in the same scope |
+| **Step Into** | `F11` — dive into the function call on the current line |
+| **Step Out** | `Shift+F11` — finish the current function and go up one frame |
+| **Continue** | `F5` — resume until the next breakpoint |
+| **Stop** | `Shift+F5` — terminate the process immediately |
+| **Variables Panel** | Inspect all local variables — Name, Type, and Value shown live |
+| **Edit Variables** | **Double-click any value** to modify it in the running process |
+| **Call Stack** | Full stack frame list — see exactly where you are in the call chain |
+| **Console Output** | All `print()` output and `stderr` stream live into the Console tab |
+| **Active Line** | The currently paused line is highlighted in amber in the editor |
+
+### The Debug Panel
+
+When a debug session starts, a dedicated **PyCharm-style panel** slides in at the bottom of the editor with three tabs:
+
+- **Variables** — Live local variable inspector. Double-click any value to edit it directly in the running Python process.
+- **Console** — Real-time stdout/stderr output from your script.
+- **Call Stack** — Every stack frame, top to bottom. The active frame is highlighted in blue.
+
+The panel is resizable (drag the top edge), and a color-coded status badge in the header shows `RUNNING` → `PAUSED` → `STOPPED` as your session progresses.
+
+---
+
+## 🏃 Run Code Directly
 
 Hit `F5` or `Ctrl+Shift+R` to **auto-save and execute** the current file in the integrated terminal:
 
-| File Type | Runner |
+| File Type | Action |
 |---|---|
-| `.py` | `python` |
+| `.py` | **Launch Python Debugger** (if breakpoints set) or `python` in terminal |
 | `.js` | `node` |
 | `.rs` | `rustc` → execute |
+| `.html` | Open in **Live Server** (auto-reload on save) |
+
+> **Tip:** For Python files, `F5` always launches the full debugger with your breakpoints — no separate debug command needed.
 
 ---
 

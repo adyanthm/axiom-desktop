@@ -21,6 +21,7 @@ import { searchKeymap, search } from '@codemirror/search';
 import { foldGutter, foldKeymap } from '@codemirror/language';
 import { state } from './state.js';
 import { longLineExtension } from './longLine.js';
+import { breakpointGutter, debugLineState } from './breakpoints.js';
 
 // ── Dirty-version tracking ───────────────────────────────────────────────────
 // Maps filePath → the doc.version (integer) at the time the file was last
@@ -62,6 +63,8 @@ export function createEditorState(content, langExt = []) {
       history(),
       EditorState.allowMultipleSelections.of(true),
       drawSelection(),
+      breakpointGutter,
+      debugLineState,
       lineNumbers(),
       foldGutter({
         markerDOM: (open) => {

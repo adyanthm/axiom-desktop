@@ -111,7 +111,10 @@
         <div class="editor-header">
           <div class="tabs" id="tabs-container"></div>
           <div class="editor-actions" id="editor-actions" style="display: none;">
-            <button id="run-btn" title="Run File (F5 / Ctrl+Shift+R)">
+            <button id="debug-editor-btn" title="Debug File (F5)">
+              <i class="fa-solid fa-bug" style="color: #E06C75;"></i>
+            </button>
+            <button id="run-btn" title="Run File (Ctrl+Shift+R)">
               <i class="fa-solid fa-play"></i>
             </button>
           </div>
@@ -119,7 +122,50 @@
         <div class="editor-breadcrumb" id="editor-breadcrumb"></div>
         <div id="editor-welcome"></div>
         <div id="editor-wrap"></div>
-        <!-- Terminal Resizer -->
+        <!-- Dedicated Debug Panel (PyCharm-style) -->
+        <div id="debug-panel" class="hidden">
+          <!-- Sidebar: Step Controls -->
+          <div id="debug-panel-sidebar">
+            <button id="debug-continue" title="Continue (F5)"><i class="fa-solid fa-play"></i></button>
+            <button id="debug-step-over" title="Step Over (F10)"><i
+                class="fa-solid fa-arrow-right-to-bracket"></i></button>
+            <button id="debug-step-into" title="Step Into (F11)"><i class="fa-solid fa-arrow-turn-down"></i></button>
+            <button id="debug-step-out" title="Step Out (Shift+F11)"><i class="fa-solid fa-arrow-turn-up"></i></button>
+            <div class="debug-sidebar-sep"></div>
+            <button id="debug-stop" title="Stop (Shift+F5)"><i class="fa-solid fa-stop"></i></button>
+          </div>
+          <!-- Main Content Area -->
+          <div id="debug-panel-main">
+            <!-- Tab Bar -->
+            <div id="debug-panel-tabs">
+              <button class="debug-tab active" data-tab="variables">
+                <i class="fa-solid fa-database"></i> Variables
+              </button>
+              <button class="debug-tab" data-tab="console">
+                <i class="fa-solid fa-terminal"></i> Console
+              </button>
+              <button class="debug-tab" data-tab="callstack">
+                <i class="fa-solid fa-layer-group"></i> Call Stack
+              </button>
+              <div class="debug-tabs-spacer"></div>
+              <button id="debug-panel-close" title="Close Debug Panel"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <!-- Tab: Variables -->
+            <div id="debug-tab-variables" class="debug-tab-content active">
+              <div id="debug-variables-list"><span class="debug-empty-hint">Run the debugger to inspect
+                  variables.</span></div>
+            </div>
+            <!-- Tab: Console Output -->
+            <div id="debug-tab-console" class="debug-tab-content">
+              <div id="debug-console-output"></div>
+            </div>
+            <!-- Tab: Call Stack -->
+            <div id="debug-tab-callstack" class="debug-tab-content">
+              <div id="debug-callstack-list"><span class="debug-empty-hint">Paused frames will appear here.</span></div>
+            </div>
+          </div>
+        </div>
+        <!-- Term/Debug Resizer -->
         <div id="terminal-resizer" style="height: 4px; cursor: ns-resize; display: none;"></div>
         <!-- Terminal Panel -->
         <div id="terminal-panel"

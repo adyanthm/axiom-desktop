@@ -20,7 +20,9 @@ export async function updateWindowTitle() {
   } else if (state.currentFile) {
     title = `${pathBasename(state.currentFile)} — Axiom Editor`;
   }
-  await win.setTitle(title);
+  try {
+    await win.setTitle(title);
+  } catch(e) { /* Ignore permission errors or non-tauri contexts */ }
 }
 
 // ── Open File ─────────────────────────────────────────────────────────────────

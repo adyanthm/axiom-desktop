@@ -15,6 +15,20 @@ export function getTerminal() {
   return term;
 }
 
+export async function writeToTerminal(text) {
+  if (!term) {
+      await toggleTerminal(); // Ensure it creates the terminal UI if it's hidden/null
+  }
+  const panel = document.getElementById('terminal-panel');
+  if (panel && panel.style.display === 'none') {
+      await toggleTerminal();
+  }
+  
+  // Format pure newlines into carriage returns so xterm handles it right
+  const formattedText = text.replace(/\n/g, '\r\n').replace(/\r\r\n/g, '\r\n');
+  term.write(formattedText);
+}
+
 export async function toggleTerminal() {
   const panel   = document.getElementById('terminal-panel');
   const resizer = document.getElementById('terminal-resizer');
@@ -69,13 +83,15 @@ export async function toggleTerminal() {
         const newTerminalHeight = document.getElementById('editor-area').getBoundingClientRect().bottom - e.clientY;
         if (newTerminalHeight > 100 && newTerminalHeight < totalHeight - 100) {
           panel.style.height = newTerminalHeight + 'px';
-          fitAddon.fit();
+          requestAnimationFrame(() => fitAddon.fit());
         }
       });
       document.addEventListener('mouseup', () => isDragging = false);
 
       window.addEventListener('resize', () => {
-        if (panel.style.display !== 'none') fitAddon.fit();
+        if (panel.style.display !== 'none') {
+            requestAnimationFrame(() => fitAddon.fit());
+        }
       });
 
       document.getElementById('action-close-terminal').addEventListener('click', () => {

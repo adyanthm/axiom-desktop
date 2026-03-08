@@ -132,7 +132,35 @@ window.addEventListener('keydown', async e => {
   if (ctrl && alt && k === 'z') { e.preventDefault(); execCmd('toggle-zoom'); return; }
 
   // Execution
-  if (!ctrl && !shift && !alt && k === 'f5') { e.preventDefault(); runCurrentFile(); return; }
+  if (!ctrl && !shift && !alt && k === 'f5') { 
+    e.preventDefault(); 
+    if (state.currentFile?.endsWith('.py')) {
+      import('./debug.js').then(m => m.startDebugging());
+    } else {
+      runCurrentFile();
+    }
+    return; 
+  }
+  if (!ctrl && shift && !alt && k === 'f5') { 
+    e.preventDefault(); 
+    import('./debug.js').then(m => m.stopDebugging()); 
+    return; 
+  }
+  if (!ctrl && !shift && !alt && k === 'f10') { 
+    e.preventDefault(); 
+    import('./debug.js').then(m => m.sendDapRequest('next', { threadId: 1 })); 
+    return; 
+  }
+  if (!ctrl && !shift && !alt && k === 'f11') { 
+    e.preventDefault(); 
+    import('./debug.js').then(m => m.sendDapRequest('stepIn', { threadId: 1 })); 
+    return; 
+  }
+  if (!ctrl && shift && !alt && k === 'f11') { 
+    e.preventDefault(); 
+    import('./debug.js').then(m => m.sendDapRequest('stepOut', { threadId: 1 })); 
+    return; 
+  }
   if (ctrl && shift && !alt && k === 'r')    { e.preventDefault(); runCurrentFile(); return; }
 
   // Toggle Terminal
