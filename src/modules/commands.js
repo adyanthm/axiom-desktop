@@ -20,6 +20,7 @@ const commands = [
   { id: 'new-file',                label: 'File: New File' },
   { id: 'new-folder',              label: 'File: New Folder' },
   { id: 'save-file',               label: 'File: Save' },
+  { id: 'global-search',           label: 'File: Global Search' },
   
   // ── View / Scale Commands ──
   { id: 'editor-zoom-in',          label: 'View: Zoom In (Editor Font)' },
@@ -138,6 +139,7 @@ export async function execCmd(id) {
       import('./fs.js').then(m => m.startInlineCreate(state.currentFile ? pathDirname(state.currentFile) : state.rootDirPath, 'directory'));
       break;
     case 'save-file':       import('./files.js').then(m => m.saveFile()); break;
+    case 'global-search':   import('./search.js').then(m => m.openGlobalSearch()); break;
     
     // Effects
     case 'toggle-glow':     import('./effects.js').then(m => m.toggleGlow()); break;

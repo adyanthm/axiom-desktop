@@ -13,7 +13,7 @@
 <br/>
 
 [![Stars](https://img.shields.io/github/stars/adyanthm/axiom-desktop?style=for-the-badge&color=528bff&labelColor=1a1d23)](https://github.com/adyanthm/axiom-desktop)
-[![Version](https://img.shields.io/badge/version-0.1.8-528bff?style=for-the-badge&labelColor=1a1d23)](https://github.com/adyanthm/axiom-desktop)
+[![Version](https://img.shields.io/badge/version-0.1.9-528bff?style=for-the-badge&labelColor=1a1d23)](https://github.com/adyanthm/axiom-desktop)
 [![License](https://img.shields.io/badge/license-MIT-98c379?style=for-the-badge&labelColor=1a1d23)](./LICENSE.md)
 [![FOSS](https://img.shields.io/badge/FOSS-100%25-56b6c2?style=for-the-badge&labelColor=1a1d23)](#-free--open-source-software)
 [![Built With](https://img.shields.io/badge/backend-Rust%20%2B%20Tauri-e06c75?style=for-the-badge&labelColor=1a1d23)](https://tauri.app/)
@@ -175,6 +175,21 @@ Axiom's Command Palette doubles as a **blazing-fast fuzzy file finder**. Hit `Ct
 - Shows file icons and relative paths for every result
 
 ---
+
+### 🔍 Project-Wide Global Search
+
+Axiom features a high-performance global search engine built in Rust. Access it with `Ctrl+Shift+F` to search through the contents of every file in your project simultaneously.
+
+| Feature | Details |
+|---|---|
+| **Streaming Results** | Results appear instantly as they are found — no waiting for a full scan |
+| **Smart Filtering** | Automatically ignores binary files (`.exe`, `.zip`), git-ignored files, and hidden directories |
+| **Rich Highlighting** | Matches are highlighted within syntax-colored code previews |
+| **Deep Navigation** | Clicking a result jumps to the file, line, and selects the matching text |
+| **Fuzzy & Regex** | Powered by the `ignore` and `regex` Rust crates for maximum reliability |
+
+---
+
 
 ### 🎨 Visual Effects
 

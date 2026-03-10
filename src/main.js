@@ -13,6 +13,7 @@ import './modules/commands.js';
 import './modules/menubar.js';
 import './modules/contextmenu.js';
 import './modules/debug.js';
+import './modules/search.js';
 import { initZoom } from './modules/zoom.js';
 initZoom();
 

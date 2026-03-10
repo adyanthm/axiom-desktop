@@ -1,6 +1,6 @@
 [package]
 name = "axiom-editor"
-version = "0.1.8"
+version = "0.1.9"
 description = "Blazing fast code editor with multi language support, and all other neccessary things"
 authors = ["Adyanth"]
 license = "MIT"
@@ -38,6 +38,8 @@ tungstenite = "0.28.0"
 tokio-tungstenite = "0.28.0"
 url = "2.5.8"
 futures-util = "0.3.32"
+ignore = "0.4.25"
+regex = "1.12.3"
 
 [profile.release]
 opt-level = 3

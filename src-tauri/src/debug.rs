@@ -6,7 +6,6 @@ use tokio::process::Command;
 use tokio_tungstenite::accept_async;
 use tokio_tungstenite::tungstenite::Message;
 use tauri::{AppHandle, Manager, path::BaseDirectory};
-use std::path::Path;
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
 

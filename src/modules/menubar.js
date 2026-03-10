@@ -75,6 +75,7 @@ function handleMenu(action) {
     case 'toggle-zoom':       execCmd('toggle-zoom'); break;
 
     case 'go-to-file':        togglePalette(false, 'file'); break;
+    case 'global-search':     import('./search.js').then(m => m.openGlobalSearch()); break;
   }
 }
 
@@ -109,6 +110,7 @@ window.addEventListener('keydown', async e => {
   if (ctrl && !shift && !alt && k === 'p') { e.preventDefault(); togglePalette(false, 'file'); return; }
   if (ctrl &&  shift && !alt && k === 'p') { e.preventDefault(); togglePalette(false, 'command'); return; }
   if (ctrl && !shift && !alt && k === 'o') { e.preventDefault(); openSingleFile(); return; }
+  if (ctrl &&  shift && !alt && k === 'f') { e.preventDefault(); import('./search.js').then(m => m.openGlobalSearch()); return; }
 
   // Tab cycling
   if (ctrl && !alt && k === 'tab') {

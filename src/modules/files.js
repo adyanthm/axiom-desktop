@@ -64,7 +64,13 @@ export async function openFile(filePath, focusEditor = true) {
   import('./welcome.js').then(m => m.showWelcome(false));
   document.getElementById('editor-wrap').style.display = 'flex';
   const ea = document.getElementById('editor-actions');
-  if (ea) ea.style.display = 'flex';
+  if (ea) {
+    ea.style.display = 'flex';
+    const debugBtn = document.getElementById('debug-editor-btn');
+    if (debugBtn) {
+      debugBtn.style.display = filePath.toLowerCase().endsWith('.py') ? 'inline-block' : 'none';
+    }
+  }
   const bc = document.getElementById('editor-breadcrumb');
   if (bc) bc.style.display = 'flex';
 

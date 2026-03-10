@@ -55,6 +55,8 @@
         <div class="menu-dropdown" id="menu-view">
           <div class="menu-entry" data-action="command-palette"><span>Command Palette</span><span
               class="menu-shortcut">Ctrl+Shift+P</span></div>
+          <div class="menu-entry" data-action="global-search"><span>Search</span><span
+              class="menu-shortcut">Ctrl+Shift+F</span></div>
           <div class="menu-separator"></div>
           <div class="menu-entry" data-action="keyboard-shortcuts"><span>Keyboard Shortcuts</span><span
               class="menu-shortcut">Ctrl+K Ctrl+S</span></div>
@@ -230,6 +232,25 @@
       <div id="command-palette" aria-modal="true">
         <input type="text" id="command-input" placeholder="Type a command..." autocomplete="off" spellcheck="false" />
         <div class="palette-list" id="palette-list"></div>
+      </div>
+    </div>
+
+    <!-- Global Search -->
+    <div id="global-search-overlay" class="hidden">
+      <div id="global-search-panel" aria-modal="true">
+        <div class="global-search-header">
+          <div class="global-search-header-left">
+            <i class="fa-solid fa-search" style="margin-right: 8px; color: var(--accent-color);"></i>
+            <span class="global-search-title">Global Search</span>
+          </div>
+          <button class="global-search-close-btn" id="global-search-close-btn"><i
+              class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="global-search-bar">
+          <input type="text" id="global-search-input" placeholder="Search across all files (use Enter)"
+            autocomplete="off" spellcheck="false" />
+        </div>
+        <div class="global-search-results" id="global-search-results"></div>
       </div>
     </div>
 

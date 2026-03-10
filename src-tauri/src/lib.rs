@@ -249,6 +249,79 @@ async fn get_debug_port(app: tauri::AppHandle, state: tauri::State<'_, AppState>
     Ok(p)
 }
 
+#[derive(Serialize, Clone)]
+pub struct SearchResult {
+    path: String,
+    line_number: usize,
+    line_text: String,
+}
+
+#[tauri::command]
+async fn global_search(window: tauri::Window, dir: String, query: String) -> Result<(), String> {
+    use ignore::WalkBuilder;
+    use regex::RegexBuilder;
+    use tauri::Emitter;
+
+    if query.trim().is_empty() {
+        return Ok(());
+    }
+
+    let re = RegexBuilder::new(&regex::escape(&query))
+        .case_insensitive(true)
+        .build()
+        .map_err(|e| format!("Invalid regex: {}", e))?;
+
+    let binary_exts = vec![
+        "exe", "dll", "so", "dylib", "bin", "obj", "o", "a", "lib",
+        "zip", "tar", "gz", "7z", "rar", "png", "jpg", "jpeg", "gif", "ico",
+        "pdf", "docx", "xlsx", "pptx", "sqlite", "db", "pyc", "pyd", "pyo",
+    ];
+
+    let query_clone = query.clone();
+    tokio::spawn(async move {
+        let iter = WalkBuilder::new(&dir)
+            .hidden(true)
+            .ignore(true)
+            .git_ignore(true)
+            .build();
+
+        let mut count = 0;
+        for result in iter {
+            let entry = match result {
+                Ok(e) => e,
+                Err(_) => continue,
+            };
+            if entry.file_type().map_or(false, |ft| ft.is_file()) {
+                if let Some(ext) = entry.path().extension().and_then(|s| s.to_str()) {
+                    if binary_exts.contains(&ext.to_lowercase().as_str()) {
+                        continue;
+                    }
+                }
+
+                if let Ok(content) = fs::read_to_string(entry.path()) {
+                    for (i, line) in content.lines().enumerate() {
+                        if re.is_match(line) {
+                            let _ = window.emit("search_result", SearchResult {
+                                path: entry.path().to_string_lossy().into_owned(),
+                                line_number: i + 1,
+                                line_text: line.trim().to_string(),
+                            });
+                            count += 1;
+                            if count >= 1000 {
+                                let _ = window.emit("search_finished", ());
+                                return;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        let _ = window.emit("search_finished", ());
+    });
+
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -272,6 +345,7 @@ pub fn run() {
             notify_live_server,
             get_lsp_port,
             get_debug_port,
+            global_search,
         ])
         .setup(|app| {
             app.manage(AppState {

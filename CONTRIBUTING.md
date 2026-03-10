@@ -97,6 +97,7 @@ axiom/
 │       ├── files.js           # File logic (open, save, drag-drop)
 │       ├── explorer.js        # File tree rendering UI
 │       ├── commands.js        # Fuzzy search and command execution
+│       ├── search.js          # Project-wide global search system (streaming results)
 │       ├── runner.js          # File execution and Live Server logic
 │       ├── zoom.js            # Editor font scaling & complete UI scaling mechanics
 │       ├── longLine.js        # Performance guard for truncated DOM rendering
@@ -316,7 +317,7 @@ There is no linter or formatter configured. Follow the conventions already prese
 
 - **No frameworks.** Vanilla JS, operating strictly via ES modules.
 - **Global State:** All shared variables MUST live inside `export const state = {}` within `src/modules/state.js`. Never mutate global variables outside of this object.
-- **Circular Dependencies:** Avoid circular imports by using dynamic `import('./file.js')` when required inside execution flows.
+- **Circular Dependencies:** Avoid circular imports by using dynamic `import()` when required inside execution flows.
 - **No TypeScript.** The project is intentionally plain JS for accessibility and simplicity.
 - Use `const` and `let` — never `var`.
 - Arrow functions for callbacks. Named functions (with `function` keyword) for top-level declarations.
@@ -427,6 +428,7 @@ fn read_file_text(path: String) -> Result<String, String> {
 | `start_terminal` | Spawn a PTY terminal process | `cwd: Option<String>` |
 | `terminal_input` | Send input to the terminal | `input: String` |
 | `resize_terminal` | Resize the PTY | `rows: u16, cols: u16` |
+| `global_search` | Walk project and emit contents matching a query | `dir: String, query: String` |
 | `get_debug_port` | Start DAP WebSocket server, return port | *(none)* |
 | `start_lsp` | Start Pyright LSP server, return port | *(none)* |
 
@@ -609,6 +611,14 @@ When submitting a PR, verify the following still work:
 - [ ] `Ctrl+P` → fuzzy file search works
 - [ ] Arrow keys + Enter to select
 - [ ] Escape to close
+
+**Global Search:**
+- [ ] `Ctrl+Shift+F` → Search panel opens
+- [ ] Type query + Enter → Results stream in live
+- [ ] File icons and syntax highlighting are present
+- [ ] Click result → Navigates to correct line and highlights match
+- [ ] Binary files/Git-ignored files are skipped correctly
+- [ ] Escape closes the panel
 
 **Effects:**
 - [ ] Each effect toggles independently
