@@ -11,7 +11,7 @@ import { openFile, updateWindowTitle } from './files.js';
 export function findFirstFile(nodes, ext) {
   for (const n of nodes) {
     if (n.type === 'file' && n.name.endsWith(ext)) return n.path;
-    if (n.type === 'directory' && n.children) {
+    if (n.type === 'directory' && n.children && n.children.length > 0) {
       const f = findFirstFile(n.children, ext);
       if (f) return f;
     }
@@ -24,7 +24,7 @@ export function getAllFilePaths(nodes) {
   if (!nodes) return paths;
   for (const n of nodes) {
     if (n.type === 'file') paths.push(n.path);
-    else if (n.children)  paths.push(...getAllFilePaths(n.children));
+    else if (n.children && n.children.length > 0)  paths.push(...getAllFilePaths(n.children));
   }
   return paths;
 }
@@ -35,7 +35,6 @@ export async function scanDir(dirPath) {
   try {
     const entries = await invoke('list_dir', { path: dirPath });
     for (const entry of entries) {
-      // Skip hidden, node_modules, Python cache, Rust build artefacts
       if (
         entry.name.startsWith('.') ||
         entry.name === 'node_modules' ||
@@ -44,8 +43,7 @@ export async function scanDir(dirPath) {
       ) continue;
 
       if (entry.is_directory) {
-        const sub = await scanDir(entry.path);
-        children.push({ name: entry.name, path: entry.path, type: 'directory', children: sub });
+        children.push({ name: entry.name, path: entry.path, type: 'directory', children: null });
       } else {
         children.push({ name: entry.name, path: entry.path, type: 'file' });
       }
@@ -54,7 +52,6 @@ export async function scanDir(dirPath) {
     console.error('scanDir failed:', dirPath, e);
   }
 
-  // Directories first, then files, both alphabetically
   children.sort((a, b) => {
     if (a.type !== b.type) return a.type === 'directory' ? -1 : 1;
     return a.name.localeCompare(b.name);
@@ -69,6 +66,8 @@ export async function refreshTree() {
     renderExplorer();
     return;
   }
+  // Shallow refresh of the root. 
+  // TODO: In a more advanced impl, we might want to refresh all expanded dirs.
   const children = await scanDir(state.rootDirPath);
   state.fileTree = { name: state.rootName, path: state.rootDirPath, type: 'directory', children };
   const { renderExplorer } = await import('./explorer.js');

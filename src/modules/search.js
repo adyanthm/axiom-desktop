@@ -106,6 +106,7 @@ function addSearchResult(res) {
   
   div.addEventListener('click', () => {
     closeGlobalSearch();
+    import('./explorer.js').then(m => m.revealInExplorer(res.path));
     openFile(res.path).then(() => {
       setTimeout(() => {
           import('./editor.js').then(m => {

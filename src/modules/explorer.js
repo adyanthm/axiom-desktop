@@ -188,10 +188,65 @@ function updateSelectionUI() {
   });
 }
 
-function toggleDir(path) {
-  if (state.expandedDirs.has(path)) state.expandedDirs.delete(path);
-  else state.expandedDirs.add(path);
+async function toggleDir(path) {
+  if (state.expandedDirs.has(path)) {
+    state.expandedDirs.delete(path);
+  } else {
+    state.expandedDirs.add(path);
+    // Lazy load: if children are null, fetch them
+    const node = findNodeByPath(state.fileTree, path);
+    if (node && node.type === 'directory' && node.children === null) {
+       const { scanDir } = await import('./fs.js');
+       node.children = await scanDir(path);
+    }
+  }
   renderExplorer();
+}
+
+export async function revealInExplorer(filePath) {
+  if (!state.rootDirPath || !filePath.startsWith(state.rootDirPath)) return;
+  
+  const rel = filePath.substring(state.rootDirPath.length).replace(/^[\\\/]/, '');
+  const segments = rel.split(/[\\\/]/);
+  segments.pop(); // remove file name
+
+  let currentPath = state.rootDirPath;
+  for (const seg of segments) {
+    const { SEP } = await import('./utils.js');
+    currentPath += (currentPath.endsWith(SEP) ? '' : SEP) + seg;
+    state.expandedDirs.add(currentPath);
+
+    const node = findNodeByPath(state.fileTree, currentPath);
+    if (node && node.type === 'directory' && node.children === null) {
+      const { scanDir } = await import('./fs.js');
+      node.children = await scanDir(currentPath);
+    }
+  }
+
+  state.selectedPaths.clear();
+  state.selectedPaths.add(filePath);
+  state.lastClickedPath = filePath;
+  
+  renderExplorer();
+
+  // Scroll into view
+  setTimeout(() => {
+    const el = document.querySelector(`[data-path="${esc(filePath)}"]`);
+    if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    updateSelectionUI();
+  }, 100);
+}
+
+function findNodeByPath(root, targetPath) {
+  if (!root) return null;
+  if (root.path === targetPath) return root;
+  if (root.children) {
+    for (const child of root.children) {
+      const found = findNodeByPath(child, targetPath);
+      if (found) return found;
+    }
+  }
+  return null;
 }
 
 // ── Inline Creator (new file/folder input inside the tree) ────────────────────

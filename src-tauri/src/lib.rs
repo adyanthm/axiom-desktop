@@ -260,6 +260,8 @@ pub struct SearchResult {
 async fn global_search(window: tauri::Window, dir: String, query: String) -> Result<(), String> {
     use ignore::WalkBuilder;
     use regex::RegexBuilder;
+    use std::io::{BufRead, BufReader};
+    use std::sync::{Arc, Mutex};
     use tauri::Emitter;
 
     if query.trim().is_empty() {
@@ -278,44 +280,82 @@ async fn global_search(window: tauri::Window, dir: String, query: String) -> Res
     ];
 
     let query_clone = query.clone();
+    let re_arc = Arc::new(re);
+    let count = Arc::new(Mutex::new(0));
+
     tokio::spawn(async move {
-        let iter = WalkBuilder::new(&dir)
+        let walker = WalkBuilder::new(&dir)
             .hidden(true)
             .ignore(true)
             .git_ignore(true)
-            .build();
+            .threads(std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4)) // Use available parallelism
+            .build_parallel();
 
-        let mut count = 0;
-        for result in iter {
-            let entry = match result {
-                Ok(e) => e,
-                Err(_) => continue,
-            };
-            if entry.file_type().map_or(false, |ft| ft.is_file()) {
-                if let Some(ext) = entry.path().extension().and_then(|s| s.to_str()) {
-                    if binary_exts.contains(&ext.to_lowercase().as_str()) {
-                        continue;
+        walker.run(|| {
+            let window = window.clone();
+            let re = Arc::clone(&re_arc);
+            let binary_exts = binary_exts.clone();
+            let count = Arc::clone(&count);
+
+            Box::new(move |result| {
+                let entry = match result {
+                    Ok(e) => e,
+                    Err(_) => return ignore::WalkState::Continue,
+                };
+
+                if entry.file_type().map_or(false, |ft| ft.is_file()) {
+                    let path = entry.path();
+                    
+                    // Skip binary extensions
+                    if let Some(ext) = path.extension().and_then(|s| s.to_str()) {
+                        if binary_exts.contains(&ext.to_lowercase().as_str()) {
+                            return ignore::WalkState::Continue;
+                        }
                     }
-                }
 
-                if let Ok(content) = fs::read_to_string(entry.path()) {
-                    for (i, line) in content.lines().enumerate() {
-                        if re.is_match(line) {
-                            let _ = window.emit("search_result", SearchResult {
-                                path: entry.path().to_string_lossy().into_owned(),
-                                line_number: i + 1,
-                                line_text: line.trim().to_string(),
-                            });
-                            count += 1;
-                            if count >= 1000 {
-                                let _ = window.emit("search_finished", ());
-                                return;
+                    // Check file size - skip if > 10MB for speed and memory
+                    if let Ok(meta) = entry.metadata() {
+                        if meta.len() > 10_000_000 {
+                            return ignore::WalkState::Continue;
+                        }
+                    }
+
+                    if let Ok(file) = std::fs::File::open(path) {
+                        let reader = BufReader::new(file);
+                        for (i, line_result) in reader.lines().enumerate() {
+                            // Check count before continuing
+                            {
+                                let c = count.lock().unwrap();
+                                if *c >= 1000 {
+                                    return ignore::WalkState::Quit;
+                                }
+                            }
+
+                            if let Ok(line) = line_result {
+                                if re.is_match(&line) {
+                                    let _ = window.emit("search_result", SearchResult {
+                                        path: path.to_string_lossy().into_owned(),
+                                        line_number: i + 1,
+                                        line_text: line.trim().to_string(),
+                                    });
+
+                                    let mut c = count.lock().unwrap();
+                                    *c += 1;
+                                    if *c >= 1000 {
+                                        return ignore::WalkState::Quit;
+                                    }
+                                }
+                            } else {
+                                // Likely binary or invalid encoding, skip file
+                                break;
                             }
                         }
                     }
                 }
-            }
-        }
+                ignore::WalkState::Continue
+            })
+        });
+
         let _ = window.emit("search_finished", ());
     });
 
