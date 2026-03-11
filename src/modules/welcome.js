@@ -18,7 +18,8 @@ export async function showWelcome(show) {
       await renderWelcomeScreen();
     } else {
       welcome.innerHTML = `
-        <i class="fa-brands fa-python" style="font-size:48px;color:#4B8BBE;opacity:0.3;"></i>
+        <img src="/logo.png" alt="Axiom Logo" 
+             style="width:80px;height:80px;opacity:0.2;margin-bottom:15px;object-fit:contain;pointer-events:none;filter:grayscale(1);" />
         <p id="welcome-message">Select a file to start editing</p>`;
     }
   } else {

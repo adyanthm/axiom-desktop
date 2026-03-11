@@ -102,18 +102,11 @@ export async function openFolder(folderPath) {
 
   const { showWelcome }    = await import('./welcome.js');
   const { renderExplorer } = await import('./explorer.js');
-  showWelcome(false);
+  showWelcome(true);
   renderExplorer();
   renderTabs();
   updateWindowTitle();
   await addRecentProject(dirPath, state.rootName);
-
-  // Auto-open the first interesting file
-  const first =
-    findFirstFile(children, '.py') ||
-    findFirstFile(children, '.js') ||
-    findFirstFile(children, '.rs');
-  if (first) openFile(first);
 }
 
 // ── File CRUD Operations ──────────────────────────────────────────────────────
