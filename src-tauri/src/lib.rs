@@ -279,7 +279,6 @@ async fn global_search(window: tauri::Window, dir: String, query: String) -> Res
         "pdf", "docx", "xlsx", "pptx", "sqlite", "db", "pyc", "pyd", "pyo",
     ];
 
-    let query_clone = query.clone();
     let re_arc = Arc::new(re);
     let count = Arc::new(Mutex::new(0));
 

@@ -1,3 +1,6 @@
+import { state } from './state.js';
+import { updateStatus } from './statusbar.js';
+
 // ── Lazy Language Loader ─────────────────────────────────────────────────────
 // Languages are only downloaded when a file with that extension is first opened.
 
@@ -73,7 +76,6 @@ const languageRegistry = {
   ]),
 };
 
-// Cache already-loaded extensions so we never fetch the same language twice
 const loadedLanguages = new Map();
 
 export async function getLanguageExtension(ext) {
@@ -91,66 +93,98 @@ export async function getLanguageExtension(ext) {
   }
 }
 
+// ── Shared LSP Pattern (VS Code Style) ──────────────────────────────────────────
+// Instead of spawning one server process per tab, we create a single client 
+// for the entire workspace and attach multiple documentUri plugins to it.
+
+const LSP_MAP = {
+  py:  { id: 'pyright', ws: 'pyright', lang: 'python' },
+  js:  { id: 'vtsls',   ws: 'vtsls',   lang: 'javascript' },
+  jsx: { id: 'vtsls',   ws: 'vtsls',   lang: 'javascript' },
+  ts:  { id: 'vtsls',   ws: 'vtsls',   lang: 'typescript' },
+  tsx: { id: 'vtsls',   ws: 'vtsls',   lang: 'typescript' },
+  mjs: { id: 'vtsls',   ws: 'vtsls',   lang: 'javascript' },
+  cjs: { id: 'vtsls',   ws: 'vtsls',   lang: 'javascript' },
+};
+
+const lspClients = new Map(); // serverId -> LanguageServerClient
+
 export async function getLspExtension(filePath) {
   if (!filePath) return [];
   const ext = filePath.split('.').pop()?.toLowerCase();
-  
-  if (ext === 'py') {
-    const { getStore } = await import('./store.js');
-    const store = await getStore();
-    const lspState = store ? await store.get('lspState') : null;
-    let isPyrightEnabled = true;
+  const cfg = LSP_MAP[ext];
+  if (!cfg) return [];
 
-    if (lspState) {
-        const pyright = lspState.find(l => l.id === 'pyright');
-        if (pyright && (!pyright.installed || !pyright.enabled)) {
-            isPyrightEnabled = false;
-        }
-    }
+  try {
+    const { LanguageServerClient, languageServerWithTransport } = await import('codemirror-languageserver');
+    const { WebSocketTransport } = await import('@open-rpc/client-js');
+    const { invoke } = await import('@tauri-apps/api/core');
 
-    if (isPyrightEnabled) {
-      try {
-        const { invoke } = await import('@tauri-apps/api/core');
-        const port = await invoke('get_lsp_port');
-        
-        // Dynamic import to keep init lightweight
-        const { languageServer } = await import('codemirror-languageserver');
-        
-        const { state } = await import('./state.js');
-        let rUri = null;
-        if (state.rootDirPath) {
-          let rPath = state.rootDirPath.replace(/\\/g, '/');
-          if (!rPath.startsWith('/')) rPath = '/' + rPath;
-          rUri = 'file://' + encodeURI(rPath);
-        }
+    let client = lspClients.get(cfg.id);
+    if (!client) {
+      const port = await invoke('get_lsp_port');
+      const wsUrl = `ws://127.0.0.1:${port}/${cfg.wsPath || cfg.ws}`;
+      
+      const transport = new WebSocketTransport(wsUrl);
+      
+      // Setup Root URI
+      let rootUri = null;
+      if (state.rootDirPath) {
+        let rPath = state.rootDirPath.replace(/\\/g, '/');
+        while (rPath.startsWith('/')) rPath = rPath.slice(1);
+        rootUri = 'file:///' + encodeURI(rPath);
+      }
 
-        let fileUri = filePath.replace(/\\/g, '/');
-        if (!fileUri.startsWith('/')) fileUri = '/' + fileUri;
-        fileUri = 'file://' + encodeURI(fileUri);
+      client = new LanguageServerClient({
+        transport,
+        rootUri,
+        workspaceFolders: rootUri ? [{ name: 'root', uri: rootUri }] : [],
+        documentUri: '', // Dynamic
+        languageId: cfg.lang,
+        autoClose: false
+      });
+      lspClients.set(cfg.id, client);
 
-        const { state: appState } = await import('./state.js');
-        appState.lspError = null; // Clear previous errors
-        
-        const lspClientExt = languageServer({
-          serverUri: `ws://127.0.0.1:${port}/pyright`, // connected to rust backend
-          rootUri: rUri,
-          documentUri: fileUri,
-          languageId: 'python',
-          allowHTMLContent: true
+      // Clean up dead clients if the backend connection drops
+      if (transport.connection) {
+        transport.connection.addEventListener('close', () => {
+          lspClients.delete(cfg.id);
         });
-        
-        import('./statusbar.js').then(m => m.updateStatus());
-        return lspClientExt;
-      } catch (e) {
-        console.error('Failed to init pyright lsp', e);
-        const { state: appState } = await import('./state.js');
-        appState.lspError = "Node.js not found. LSP can't be activated. Defaulted to lang-python";
-        import('./statusbar.js').then(m => m.updateStatus());
-        return [];
       }
     }
-  }
-  
-  return [];
-}
 
+    // Convert file path to URI
+    let fPath = filePath.replace(/\\/g, '/');
+    while (fPath.startsWith('/')) fPath = fPath.slice(1);
+    const fileUri = 'file:///' + encodeURI(fPath);
+
+    const { ViewPlugin } = await import('@codemirror/view');
+
+    // Return extension that shares this client but targets this specific file
+    const extObj = [
+      languageServerWithTransport({
+        client,
+        documentUri: fileUri,
+        languageId: cfg.lang,
+        allowHTMLContent: true
+      }),
+      ViewPlugin.define(() => ({
+        destroy() {
+          // Explicitly tell the shared server this file is closed to free memory
+          // and allow clean re-opens.
+          client.notify('textDocument/didClose', {
+            textDocument: { uri: fileUri }
+          }).catch(err => console.error('LSP didClose error:', err));
+        }
+      }))
+    ];
+
+    updateStatus();
+    return extObj;
+  } catch (e) {
+    console.error(`LSP Init failed for ${cfg.id}:`, e);
+    state.lspError = `LSP server (${cfg.id}) could not be initialized.`;
+    updateStatus();
+    return [];
+  }
+}

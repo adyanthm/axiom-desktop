@@ -6,9 +6,9 @@
   "author": "Adyanth",
   "type": "module",
   "scripts": {
-    "predev": "node scripts/copy-pyright.js && node scripts/bundle-debugpy.js",
+    "predev": "node scripts/copy-pyright.js && node scripts/bundle-debugpy.js && node scripts/bundle-vtsls.js",
     "dev": "vite",
-    "prebuild": "node scripts/copy-pyright.js && node scripts/bundle-debugpy.js",
+    "prebuild": "node scripts/copy-pyright.js && node scripts/bundle-debugpy.js && node scripts/bundle-vtsls.js",
     "build": "vite build",
     "preview": "vite preview",
     "tauri": "tauri",
@@ -17,6 +17,8 @@
   "devDependencies": {
     "@shopify/codemirror-language-client": "^0.7.4",
     "@tauri-apps/cli": "^2.10.0",
+    "@vtsls/language-server": "^0.3.0",
+    "esbuild": "^0.27.3",
     "patch-package": "^8.0.1",
     "playwright": "^1.58.2",
     "postinstall-postinstall": "^2.1.0",

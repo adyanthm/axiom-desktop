@@ -43,7 +43,8 @@
       "resources/pyright/pyright-internal.js",
       "resources/pyright/vendor.js",
       "resources/pyright/typeshed-fallback/stdlib/**/*",
-      "resources/debugpy/**/*"
+      "resources/debugpy/**/*",
+      "resources/vtsls/**/*"
     ]
   }
 }
