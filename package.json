@@ -1,14 +1,14 @@
 {
   "name": "axiom-editor",
   "private": true,
-  "version": "0.1.9",
+  "version": "0.1.10",
   "description": "Blazing fast code editor with multi language support, and all other neccessary things",
   "author": "Adyanth",
   "type": "module",
   "scripts": {
-    "predev": "node scripts/copy-pyright.js && node scripts/bundle-debugpy.js && node scripts/bundle-vtsls.js",
+    "predev": "node scripts/copy-pyright.js && node scripts/bundle-debugpy.js && node scripts/bundle-vtsls.js && node scripts/optimize-resources.js",
     "dev": "vite",
-    "prebuild": "node scripts/copy-pyright.js && node scripts/bundle-debugpy.js && node scripts/bundle-vtsls.js",
+    "prebuild": "node scripts/copy-pyright.js && node scripts/bundle-debugpy.js && node scripts/bundle-vtsls.js && node scripts/optimize-resources.js",
     "build": "vite build",
     "preview": "vite preview",
     "tauri": "tauri",

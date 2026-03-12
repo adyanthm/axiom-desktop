@@ -111,8 +111,13 @@ axiom/
 │   │   │                     #   File ops, directory listing, terminal PTY,
 │   │   │                     #   resize handling, process management
 │   │   ├── debug.rs           # DAP WebSocket bridge — spawns debugpy, bridges I/O
-│   │   └── lsp.rs             # LSP server bridge (Pyright)
-│   ├── resources/
+│   │   └── lsp.rs             # LSP server bridge (Pyright, VTSLS)
+├── scripts/                   # Resource management and build optimization
+│   ├── bundle-vtsls.js        # Flattened VTSLS dependency bundler
+│   ├── package-vtsls.js       # VTSLS entry point generation
+│   └── optimize-resources.js  # Prebuild junk remover (.pdb, .map)
+├── patches/                   # Fixes for 3rd party node_modules (codemirror-languageserver)
+├── resources/
 │   │   └── debugpy/           # Bundled debugpy distribution (pure Python)
 │   ├── icons/                 # App icons for all platforms
 │   └── capabilities/          # Tauri permission capabilities
@@ -517,7 +522,31 @@ const languageRegistry = {
 3. Add the file extension(s) to the icon map in `src/modules/icons.js`
 4. Add the extension to the file open dialog filter in `src/modules/files.js`
 
----
+525: ---
+526: 
+527: ### Language Server Protocol (LSP) Architecture
+528: 
+529: Axiom implements a robust, enterprise-grade LSP architecture designed for speed and stability on Windows.
+530: 
+531: #### 1. Shared Singleton Client
+532: All open files of the same language share a **single** `LanguageServerClient` instance. This is managed in `src/modules/languages.js`.
+533: - `autoClose` is disabled to keep the background process alive during tab switches.
+534: - Explicit `textDocument/didClose` notifications are sent manually via a CodeMirror `ViewPlugin` destructor to prevent memory leaks and handle file re-opens cleanly.
+535: - WebSocket `close` listeners automatically purge "dead" clients from the cache, allowing for clean restarts if the backend drops.
+536: 
+537: #### 2. Flattened Bundling (Windows Path Safety)
+538: To avoid Windows' 260-character path limit, `scripts/bundle-vtsls.js` uses a **flattened dependency strategy**. It copies all essential LSP packages into a single top-level `node_modules` folder within `src-tauri/resources`. This ensures deep dependency trees in `@vtsls` don't break the installed application.
+539: 
+540: #### 3. Automatic Resource Optimization
+541: The `scripts/optimize-resources.js` script runs during `prebuild` and `predev`. It recursively scrubs the `resources/` folder of:
+542: - **`.pdb` files**: Massive Windows debug symbols (saves ~15MB).
+543: - **`.map` files**: JavaScript source maps (saves ~2MB).
+544: This keeps Axiom's installer footprint under 10MB while still providing full intelligence.
+545: 
+546: #### 4. Custom Hover Tooltips (Syntax Highlighting)
+547: Axiom uses `patch-package` to fix the `codemirror-languageserver` library. The patch ensures that `MarkedString` objects (used by VTSLS) are correctly parsed as Markdown and that code blocks are rendered with proper syntax highlighting inside the editor.
+548: 
+549: ---
 
 ### Emmet Integration
 
@@ -643,7 +672,15 @@ When submitting a PR, verify the following still work:
 - [ ] Closing the panel mid-session clears the amber line highlight
 - [ ] Starting a second debug session resets the console and variable panels cleanly
 
-**Keybindings:**
+656: **LSP (Language Intelligence):**
+657: - [ ] Open a `.py` file → Autocomplete suggestions appear (Pyright)
+658: - [ ] Open a `.js` or `.ts` file → Type signatures and completions appear (VTSLS)
+659: - [ ] Hover over a variable → Tooltip appears with syntax-highlighted docs
+660: - [ ] Syntax errors (Diagnostics) appear in the gutter
+661: - [ ] Close a file and reopen it → LSP still works (didOpen/didClose cycle)
+662: - [ ] Open multiple files → Single node process is shared (check Task Manager)
+663: 
+664: **Keybindings:**
 - [ ] `Ctrl+K Ctrl+S` → settings panel opens
 - [ ] Click pencil → edit mode activates
 - [ ] Press new combo → binding updates

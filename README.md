@@ -13,7 +13,7 @@
 <br/>
 
 [![Stars](https://img.shields.io/github/stars/adyanthm/axiom-desktop?style=for-the-badge&color=528bff&labelColor=1a1d23)](https://github.com/adyanthm/axiom-desktop)
-[![Version](https://img.shields.io/badge/version-0.1.9-528bff?style=for-the-badge&labelColor=1a1d23)](https://github.com/adyanthm/axiom-desktop)
+[![Version](https://img.shields.io/badge/version-0.1.10-528bff?style=for-the-badge&labelColor=1a1d23)](https://github.com/adyanthm/axiom-desktop)
 [![License](https://img.shields.io/badge/license-MIT-98c379?style=for-the-badge&labelColor=1a1d23)](./LICENSE.md)
 [![FOSS](https://img.shields.io/badge/FOSS-100%25-56b6c2?style=for-the-badge&labelColor=1a1d23)](#-free--open-source-software)
 [![Built With](https://img.shields.io/badge/backend-Rust%20%2B%20Tauri-e06c75?style=for-the-badge&labelColor=1a1d23)](https://tauri.app/)
@@ -189,6 +189,22 @@ Axiom features a high-performance global search engine built in Rust. Access it 
 | **Fuzzy & Regex** | Powered by the `ignore` and `regex` Rust crates for maximum reliability |
 
 ---
+192: 
+193: ### 🤖 Language Server Protocol (LSP)
+194: 
+195: Axiom provides deep code intelligence via a high-performance **Shared LSP Client** architecture. It supports industrial-grade language servers out of the box with zero configuration.
+196: 
+197: | Language | Server | Features |
+198: |---|---|---|
+199: | **Python** | `Pyright` | Autocomplete, Type checking, Diagnostics, Hover docs |
+200: | **JS / TS** | `VTSLS` | Intelligent completions, Go-to-definition, Formatting, Hover info |
+201: 
+202: - **Super-lean Singleton Client**: Unlike other editors that spawn one process per file, Axiom shares a single background language server across all open tabs, saving hundreds of megabytes of RAM.
+203: - **Rich Hover Tooltips**: Get instant documentation and type signatures with full syntax highlighting inside floating tooltips.
+204: - **Real-time Diagnostics**: Syntax errors and type warnings appear instantly in the gutter as you type.
+205: - **Optimized Bundling**: LSP binaries are pre-optimized and stripped of junk files (`.pdb`, `.map`) to keep the installer size under 10MB.
+206: 
+207: ---
 
 
 ### 🎨 Visual Effects
