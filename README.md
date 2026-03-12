@@ -134,6 +134,23 @@ Axiom is **not** a single-language editor. It ships with built-in syntax highlig
 | **Vue** | `.vue` | | |
 
 Languages are **lazy-loaded** — only the parser for the file you open gets imported. Zero wasted resources.
+|
+---
+
+### 🧠 Intelligent Code Support (LSP)
+
+Axiom features high-performance Language Server Protocol (LSP) integration, providing VS Code-grade intelligence with a fraction of the memory footprint.
+
+| Feature | Details |
+|---|---|
+| **Supported Languages** | **Python** (via Pyright), **JavaScript / TypeScript** (via Vtsls) |
+| **IntelliSense** | Autocomplete, detailed hover tooltips with syntax highlighting, and signature help |
+| **Navigation** | Go to Definition (`F12`), Go to Type Definition (`Mod-F12`) |
+| **Diagnostics** | Real-time syntax and type error reporting via the lint gutter |
+| **Optimized Backend** | Uses a **Shared Client Architecture** — only one LSP process per language is ever spawned, regardless of how many files are open |
+| **Resilient Connection** | Automatic cleanup of dead servers and robust WebSocket lifecycle management |
+
+LSP servers are bundled natively with the app and optimized to remove unnecessary debug bloat (like `.pdb` symbols), keeping the installer under 10MB.
 
 ---
 
@@ -189,22 +206,6 @@ Axiom features a high-performance global search engine built in Rust. Access it 
 | **Fuzzy & Regex** | Powered by the `ignore` and `regex` Rust crates for maximum reliability |
 
 ---
-192: 
-193: ### 🤖 Language Server Protocol (LSP)
-194: 
-195: Axiom provides deep code intelligence via a high-performance **Shared LSP Client** architecture. It supports industrial-grade language servers out of the box with zero configuration.
-196: 
-197: | Language | Server | Features |
-198: |---|---|---|
-199: | **Python** | `Pyright` | Autocomplete, Type checking, Diagnostics, Hover docs |
-200: | **JS / TS** | `VTSLS` | Intelligent completions, Go-to-definition, Formatting, Hover info |
-201: 
-202: - **Super-lean Singleton Client**: Unlike other editors that spawn one process per file, Axiom shares a single background language server across all open tabs, saving hundreds of megabytes of RAM.
-203: - **Rich Hover Tooltips**: Get instant documentation and type signatures with full syntax highlighting inside floating tooltips.
-204: - **Real-time Diagnostics**: Syntax errors and type warnings appear instantly in the gutter as you type.
-205: - **Optimized Bundling**: LSP binaries are pre-optimized and stripped of junk files (`.pdb`, `.map`) to keep the installer size under 10MB.
-206: 
-207: ---
 
 
 ### 🎨 Visual Effects
