@@ -1174,6 +1174,55 @@ body {
   color: var(--accent-color) !important;
 }
 
+/* ── Hover Tooltip ── */
+.cm-tooltip-hover {
+  background: var(--bg-sidebar) !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: 6px !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, .6) !important;
+  padding: 8px 12px !important;
+  color: var(--text-main) !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  max-width: 500px;
+  word-wrap: break-word;
+}
+
+.cm-tooltip-hover .documentation {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.cm-tooltip-hover .documentation p {
+  margin-bottom: 8px;
+}
+
+.cm-tooltip-hover .documentation p:last-child {
+  margin-bottom: 0;
+}
+
+.cm-tooltip-hover .documentation code {
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  background: var(--bg-main) !important;
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.cm-tooltip-hover .documentation pre {
+  margin: 6px 0;
+  padding: 8px;
+  background: var(--bg-main) !important;
+  border-radius: 6px;
+  border: 1px solid var(--bg-tabs);
+  overflow-x: auto;
+}
+
+.cm-tooltip-hover .documentation pre code {
+  background: transparent !important;
+  padding: 0;
+  border: none;
+}
+
 /* ── Glow Effects ── */
 body.glow-effect .cm-line span:not(.cm-comment) {
   text-shadow: 0 0 2px currentColor, 0 0 4px currentColor, 0 0 5px currentColor;

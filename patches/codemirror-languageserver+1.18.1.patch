@@ -1,5 +1,5 @@
 diff --git a/node_modules/codemirror-languageserver/dist/index.js b/node_modules/codemirror-languageserver/dist/index.js
-index 70a32da..bed7578 100644
+index 70a32da..46f5e35 100644
 --- a/node_modules/codemirror-languageserver/dist/index.js
 +++ b/node_modules/codemirror-languageserver/dist/index.js
 @@ -64,6 +64,7 @@ class LanguageServerClient {
@@ -78,3 +78,50 @@ index 70a32da..bed7578 100644
                  return dom;
              };
              return completion;
+@@ -510,19 +524,43 @@ class LanguageServerPlugin {
+ }
+ const languageServerPlugin = ViewPlugin.fromClass(LanguageServerPlugin);
+ async function formatContents(contents) {
++    if (!contents) return '';
++    
+     if (isLSPMarkupContent(contents)) {
+         let value = contents.value;
+         if (contents.kind === 'markdown') {
+-            value = await marked.parse(value);
++            try {
++                value = await marked.parse(value);
++            } catch (e) {
++                // Ignore
++            }
+         }
+         return value;
+     }
+     else if (Array.isArray(contents)) {
+-        return contents.map((c) => formatContents(c) + '\n\n').join('');
++        const parts = await Promise.all(contents.map(c => formatContents(c)));
++        return parts.join('\n\n');
+     }
+     else if (typeof contents === 'string') {
+-        return contents;
++        let value = contents;
++        try {
++            value = await marked.parse(value);
++        } catch (e) {
++            // Ignore
++        }
++        return value;
++    }
++    else if (typeof contents === 'object' && contents.language !== undefined) {
++        // MarkedString of { language, value }
++        let value = `\`\`\`${contents.language}\n${contents.value}\n\`\`\``;
++        try {
++            value = await marked.parse(value);
++        } catch (e) {
++            // Ignore
++        }
++        return value;
+     }
++    return '';
+ }
+ function toSet(chars) {
+     let preamble = '';
