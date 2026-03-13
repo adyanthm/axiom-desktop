@@ -48,15 +48,15 @@ export async function runCurrentFile() {
 document.getElementById('run-btn')?.addEventListener('click', runCurrentFile);
 
 // ── Live Server ───────────────────────────────────────────────────────────────
-export async function startLiveServer(file) {
+export async function startLiveServer(file, silent = false) {
   let defaultPort = await getStore().then(s => s ? s.get('liveServerPort') : null);
   if (!defaultPort) {
     const p = await showPrompt('Live Server', 'Select port for Live Server (e.g. 5500):', '5500');
-    if (!p) return;
+    if (!p) return null;
     defaultPort = parseInt(p, 10);
     if (isNaN(defaultPort) || defaultPort <= 0) {
       await showPrompt('Error', 'Invalid port. Please specify a number.', '');
-      return;
+      return null;
     }
     const store = await getStore();
     if (store) {
@@ -74,15 +74,6 @@ export async function startLiveServer(file) {
 
     if (finalPort !== defaultPort) {
       console.log(`Live Server: Port ${defaultPort} was in use. Using ${finalPort}.`);
-      if (window.Notification && Notification.permission === 'granted') {
-        new Notification('Axiom Live Server', { body: `Port ${defaultPort} in use. Running on ${finalPort}.` });
-      } else if (window.Notification && Notification.permission !== 'denied') {
-        Notification.requestPermission().then(perm => {
-          if (perm === 'granted') {
-            new Notification('Axiom Live Server', { body: `Port ${defaultPort} in use. Running on ${finalPort}.` });
-          }
-        });
-      }
     }
 
     let relPath = file.substring(serveDir.length).replace(/\\/g, '/');
@@ -90,13 +81,17 @@ export async function startLiveServer(file) {
 
     const url = `http://localhost:${finalPort}/${relPath}`;
 
-    if (IS_TAURI) {
-      await openUrl(url);
-    } else {
-      window.open(url, '_blank');
+    if (!silent) {
+      if (IS_TAURI) {
+        await openUrl(url);
+      } else {
+        window.open(url, '_blank');
+      }
     }
+    return finalPort;
   } catch (err) {
     console.error('Failed to start Live Server:', err);
     await showPrompt('Error', 'Failed to start Live Server: ' + err, '');
+    return null;
   }
 }

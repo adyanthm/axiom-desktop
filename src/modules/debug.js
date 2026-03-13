@@ -128,117 +128,130 @@ if (consoleInputBtn) {
 let currentVarsRef = 0;
 let currentFrameId = null;
 
-function renderVariables(vars, hint) {
+function renderVariables(scopesData, hint, socket) {
   if (!varsEl) return;
   if (hint !== undefined) {
     varsEl.innerHTML = `<span class="debug-empty-hint">${hint}</span>`;
     return;
   }
-  varsEl.innerHTML = `
-    <div class="debug-var-header">
-      <span>Name</span><span>Type</span>
-      <span>Value <span class="debug-edit-hint" title="Double-click a value to modify">✎ editable</span></span>
-    </div>`;
-  if (!vars || vars.length === 0) {
-    varsEl.innerHTML += `<span class="debug-empty-hint">No local variables in this scope.</span>`;
+  varsEl.innerHTML = '';
+  
+  if (!scopesData || scopesData.length === 0) {
+    varsEl.innerHTML = `<span class="debug-empty-hint">No variables available.</span>`;
     return;
   }
-  // Filter Python dunder noise; JS shows __proto__ etc
-  const visible = currentDebugType === 'python'
-    ? vars.filter(v => !v.name.startsWith('__') || v.name === '__name__')
-    : vars.filter(v => !['__proto__', 'constructor'].includes(v.name)).slice(0, 100);
 
-  visible.forEach(v => {
-    const row = document.createElement('div');
-    row.className = 'debug-var-row';
-    const safeVal = String(v.value).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  scopesData.forEach(scope => {
+    // Add Scope Header
+    const header = document.createElement('div');
+    header.className = 'debug-var-group-header';
+    header.textContent = scope.name;
+    varsEl.appendChild(header);
 
-    const nameEl = document.createElement('span');
-    nameEl.className = 'debug-var-name';
-    nameEl.title = v.name;
-    nameEl.textContent = v.name;
-
-    const typeEl = document.createElement('span');
-    typeEl.className = 'debug-var-type';
-    typeEl.textContent = v.type || '';
-
-    const valEl = document.createElement('span');
-    valEl.className = 'debug-var-value editable-value';
-    valEl.title = 'Double-click to edit';
-    valEl.innerHTML = safeVal;
-
-    // Expandable children (objects/arrays)
-    if (v.variablesReference && v.variablesReference > 0) {
-      valEl.classList.add('has-children');
-      const chevron = document.createElement('span');
-      chevron.className = 'debug-var-expand';
-      chevron.textContent = ' ▶';
-      nameEl.appendChild(chevron);
-      let expanded = false;
-      chevron.addEventListener('click', async e => {
-        e.stopPropagation();
-        if (expanded) {
-          expanded = false; chevron.textContent = ' ▶';
-          row.querySelectorAll('.debug-var-child').forEach(c => c.remove());
-          return;
-        }
-        try {
-          const res = await sendDapRequest('variables', { variablesReference: v.variablesReference });
-          (res?.variables || []).slice(0, 50).forEach(child => {
-            const childRow = document.createElement('div');
-            childRow.className = 'debug-var-row debug-var-child';
-            childRow.innerHTML = `<span class="debug-var-name" style="padding-left:24px">${child.name}</span><span class="debug-var-type">${child.type || ''}</span><span class="debug-var-value">${String(child.value).replace(/</g,'&lt;').replace(/>/g,'&gt;')}</span>`;
-            row.after(childRow);
-          });
-          expanded = true; chevron.textContent = ' ▼';
-        } catch {}
-      });
+    const vars = scope.variables || [];
+    if (vars.length === 0) {
+      const emptyHint = document.createElement('div');
+      emptyHint.className = 'debug-empty-hint small';
+      emptyHint.textContent = 'Empty scope';
+      varsEl.appendChild(emptyHint);
+      return;
     }
 
-    // Inline edit on double-click
-    valEl.addEventListener('dblclick', e => {
-      e.stopPropagation();
-      if (valEl.querySelector('input')) return;
-      const input = document.createElement('input');
-      input.className = 'debug-var-input';
-      input.value = v.value;
-      input.autocomplete = 'off'; input.spellcheck = false;
-      valEl.innerHTML = ''; valEl.appendChild(input); valEl.classList.add('editing');
-      input.focus(); input.select();
+    // Filter noise
+    const visible = currentDebugType === 'python'
+      ? vars.filter(v => !v.name.startsWith('__') || v.name === '__name__')
+      : vars.filter(v => !['__proto__', 'constructor'].includes(v.name)).slice(0, 100);
 
-      const commit = async () => {
-        const newVal = input.value.trim();
-        valEl.classList.remove('editing');
-        if (newVal === v.value) { valEl.innerHTML = safeVal; return; }
-        valEl.innerHTML = `<span class="debug-var-setting">setting…</span>`;
-        try {
-          await sendDapRequest('setVariable', {
-            variablesReference: currentVarsRef,
-            name: v.name,
-            value: newVal,
-          });
-          const fresh = await sendDapRequest('variables', { variablesReference: currentVarsRef });
-          renderVariables(fresh?.variables || []);
-        } catch (err) {
-          valEl.innerHTML = `<span class="debug-var-error" title="${err}">⚠ error</span>`;
-          setTimeout(() => { valEl.innerHTML = safeVal; }, 2000);
-        }
-      };
-      const cancel = () => { valEl.classList.remove('editing'); valEl.innerHTML = safeVal; };
-      input.addEventListener('keydown', e => {
-        if (e.key === 'Enter')  { e.preventDefault(); commit(); }
-        if (e.key === 'Escape') { e.preventDefault(); cancel(); }
+    visible.forEach(v => {
+      const row = document.createElement('div');
+      row.className = 'debug-var-row';
+      const safeVal = String(v.value).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+      const nameEl = document.createElement('span');
+      nameEl.className = 'debug-var-name';
+      nameEl.title = v.name;
+      nameEl.textContent = v.name;
+
+      const typeEl = document.createElement('span');
+      typeEl.className = 'debug-var-type';
+      typeEl.textContent = v.type || '';
+
+      const valEl = document.createElement('span');
+      valEl.className = 'debug-var-value editable-value';
+      valEl.title = 'Double-click to edit';
+      valEl.innerHTML = safeVal;
+
+      if (v.variablesReference && v.variablesReference > 0) {
+        valEl.classList.add('has-children');
+        const chevron = document.createElement('span');
+        chevron.className = 'debug-var-expand';
+        chevron.textContent = ' ▶';
+        nameEl.appendChild(chevron);
+        let expanded = false;
+        chevron.addEventListener('click', async e => {
+          e.stopPropagation();
+          if (expanded) {
+            expanded = false; chevron.textContent = ' ▶';
+            row.querySelectorAll('.debug-var-child').forEach(c => c.remove());
+            return;
+          }
+          try {
+            const res = await sendDapRequest('variables', { variablesReference: v.variablesReference }, socket);
+            (res?.variables || []).slice(0, 50).forEach(child => {
+              const childRow = document.createElement('div');
+              childRow.className = 'debug-var-row debug-var-child';
+              childRow.innerHTML = `<span class="debug-var-name" style="padding-left:24px">${child.name}</span><span class="debug-var-type">${child.type || ''}</span><span class="debug-var-value">${String(child.value).replace(/</g,'&lt;').replace(/>/g,'&gt;')}</span>`;
+              row.after(childRow);
+            });
+            expanded = true; chevron.textContent = ' ▼';
+          } catch {}
+        });
+      }
+
+      valEl.addEventListener('dblclick', e => {
+        e.stopPropagation();
+        if (valEl.querySelector('input')) return;
+        const input = document.createElement('input');
+        input.className = 'debug-var-input';
+        input.value = v.value;
+        input.autocomplete = 'off'; input.spellcheck = false;
+        valEl.innerHTML = ''; valEl.appendChild(input); valEl.classList.add('editing');
+        input.focus(); input.select();
+
+        const cancel = () => { valEl.classList.remove('editing'); valEl.innerHTML = safeVal; };
+        const commit = async () => {
+          const newVal = input.value.trim();
+          valEl.classList.remove('editing');
+          if (newVal === v.value) { valEl.innerHTML = safeVal; return; }
+          valEl.innerHTML = `…`;
+          try {
+            await sendDapRequest('setVariable', {
+              variablesReference: scope.variablesReference,
+              name: v.name,
+              value: newVal,
+            }, socket);
+            valEl.innerHTML = newVal.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+          } catch (err) {
+            valEl.innerHTML = `⚠`;
+            setTimeout(() => { valEl.innerHTML = safeVal; }, 2000);
+          }
+        };
+
+        input.addEventListener('keydown', e => {
+          if (e.key === 'Enter')  { e.preventDefault(); commit(); }
+          if (e.key === 'Escape') { e.preventDefault(); cancel(); }
+        });
+        input.addEventListener('blur', () => setTimeout(cancel, 150));
       });
-      input.addEventListener('blur', () => setTimeout(cancel, 150));
-    });
 
-    row.appendChild(nameEl); row.appendChild(typeEl); row.appendChild(valEl);
-    varsEl.appendChild(row);
+      row.appendChild(nameEl); row.appendChild(typeEl); row.appendChild(valEl);
+      varsEl.appendChild(row);
+    });
   });
 }
 
 // ── Call Stack Renderer ──────────────────────────────────────────────────────
-function renderCallStack(frames, hint) {
+function renderCallStack(frames, hint, socket) {
   if (!stackEl) return;
   if (hint !== undefined) {
     stackEl.innerHTML = `<span class="debug-empty-hint">${hint}</span>`;
@@ -257,31 +270,45 @@ function renderCallStack(frames, hint) {
     row.addEventListener('click', async () => {
       document.querySelectorAll('.debug-frame-row').forEach(r => r.classList.remove('active'));
       row.classList.add('active');
-      await jumpToFrame(frame);
+      await jumpToFrame(frame, socket);
     });
     stackEl.appendChild(row);
   });
 }
 
-async function jumpToFrame(frame) {
+async function jumpToFrame(frame, socket) {
   if (!frame) return;
   // Highlight line (source map already resolved by js-debug)
   if (frame.line > 0) highlightDebugLine(view, frame.line);
 
-  // Fetch variables for this specific frame
+  // Fetch variables for ALL scopes (Local, Closure, Global, etc.)
   try {
-    const scopeRes = await sendDapRequest('scopes', { frameId: frame.id });
+    const scopeRes = await sendDapRequest('scopes', { frameId: frame.id }, socket);
     const scopes = scopeRes?.scopes || [];
-    const locals = scopes.find(s => s.presentationHint === 'locals')
-                || scopes.find(s => !s.expensive)
-                || scopes[0];
-    if (locals) {
-      currentVarsRef = locals.variablesReference;
-      currentFrameId = frame.id;
-      const varRes = await sendDapRequest('variables', { variablesReference: currentVarsRef });
-      renderVariables(varRes?.variables || []);
+    const scopesData = [];
+
+    for (const scope of scopes) {
+      try {
+        const varRes = await sendDapRequest('variables', { variablesReference: scope.variablesReference }, socket);
+        scopesData.push({
+          name: scope.name,
+          variablesReference: scope.variablesReference,
+          variables: varRes?.variables || []
+        });
+      } catch (err) {
+        console.error(`Failed to fetch variables for scope ${scope.name}`, err);
+      }
     }
-  } catch {}
+
+    currentFrameId = frame.id;
+    if (scopesData.length > 0) {
+      renderVariables(scopesData, undefined, socket);
+    } else {
+      renderVariables(null, 'No variables in any scope.', socket);
+    }
+  } catch (e) {
+    console.error('Failed to resolve scopes', e);
+  }
 }
 
 // ── Finish State ────────────────────────────────────────────────────────────
@@ -334,6 +361,10 @@ function handleDapMessage(msg, socket) {
         breakpoints: bps,
       }, socket)
         .then(() => sendDapRequest('configurationDone', {}, socket))
+        .then(() => {
+          renderVariables(null, 'Debugger attached. Pause to inspect variables.', socket);
+          renderCallStack(null, 'Process is running.', socket);
+        })
         .catch(console.error);
 
     } else if (msg.event === 'output') {
@@ -349,6 +380,8 @@ function handleDapMessage(msg, socket) {
     } else if (msg.event === 'continued') {
       setStatus('RUNNING');
       highlightDebugLine(view, -1);
+      renderVariables(null, 'Process is running. Pause to inspect variables.', socket);
+      renderCallStack(null, 'No active frames (running).', socket);
 
     } else if (msg.event === 'terminated' || msg.event === 'exited') {
       const hasError = msg.body?.exitCode !== undefined && msg.body.exitCode !== 0;
@@ -516,21 +549,24 @@ async function startChromeDebugging() {
   consolePrint('─────────────────────────────────\n', 'info');
 
   // Find the live server URL or fall back to file://
-  const liveServerPort = 5500;
   let url;
   if (file.endsWith('.html')) {
     // Try to start the live server for the HTML file
     try {
-      await startLiveServer(file);
-      const serveDir = state.rootDirPath || '';
+      const actualPort = await startLiveServer(file, true); // true = silent (don't open in system browser)
+      if (!actualPort) return; 
+
+      const serveDir = state.rootDirPath || file.substring(0, Math.max(file.lastIndexOf('/'), file.lastIndexOf('\\')) + 1) || '';
       let rel = file.substring(serveDir.length).replace(/\\/g, '/');
       if (rel.startsWith('/')) rel = rel.substring(1);
-      url = `http://localhost:${liveServerPort}/${rel}`;
-    } catch {
+      url = `http://localhost:${actualPort}/${rel}`;
+    } catch (e) {
+      console.error('Chrome Debug: Live Server failed', e);
       url = `file:///${file.replace(/\\/g, '/')}`;
     }
   } else {
-    url = `http://localhost:${liveServerPort}/`;
+    // For JS files, we probably want to debug them in a generic page or the project root
+    url = `file:///${file.replace(/\\/g, '/')}`;
   }
 
   try {
@@ -551,7 +587,8 @@ async function startChromeDebugging() {
         stopOnEntry: true,
         sourceMaps: true,
         skipFiles: ['<node_internals>/**'],
-        userDataDir: false, // use default Chrome profile
+        userDataDir: true, // Use temporary profile to avoid conflicts
+        runtimeArgs: ['--remote-allow-origins=*'], // Help with attachment
       })).catch(e => { consolePrint(`Launch failed: ${e}\n`, 'err'); setStatus('ERROR'); });
     });
   } catch (e) {

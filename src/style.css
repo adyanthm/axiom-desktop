@@ -2200,6 +2200,24 @@ body.zoom-active .cm-editor {
   padding: 16px;
 }
 
+.debug-var-group-header {
+  background: rgba(255, 255, 255, 0.05);
+  padding: 4px 10px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  margin-top: 4px;
+}
+
+.debug-var-group-header:first-child {
+  margin-top: 0;
+  border-top: none;
+}
+
 /* ── Variables Tab ── */
 #debug-variables-list {
   width: 100%;
