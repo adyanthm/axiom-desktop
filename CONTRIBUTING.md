@@ -479,16 +479,18 @@ User presses F5
    │
    ▼
 [Rust] debug.rs binds a WebSocket server on a random port,
-       then spawns either `python -m debugpy.adapter` or `node dapDebugServer.js --stdio`
-   │
-   ▼
+       then spawns either `python -m debugpy.adapter` or `node dapDebugServer.js --tcp`
+    │
+    ▼
 [Frontend] Opens WebSocket to ws://127.0.0.1:{port}
-   │
-   ▼
-[Rust] Bridges WebSocket ↔ process stdin/stdout
-   │   (strips DAP HTTP-style headers, passes raw JSON)
-   ▼
-[Frontend] Sends DAP requests (initialize → launch → setBreakpoints → configurationDone)
+    │
+    ▼
+[Rust] Bridges WebSocket ↔ process via TCP Multiplexing
+       (Handles multiple sub-sessions for JS debug targets)
+    │
+    ▼
+[Frontend] Sends DAP requests (initialize → launch)
+[Frontend] Handles 'startDebugging' requests from broker to connect to target session
 [Frontend] Receives DAP events (initialized, stopped, output, terminated…)
    │
    ▼
@@ -508,9 +510,10 @@ On 'stopped': frontend requests stackTrace + scopes + variables
 | `src-tauri/resources/jsdebug/` | Bundled Vscode JS Debug server |
 
 **To extend the debugger** (e.g., add watch expressions):
-1. Send a `evaluate` DAP request with the expression and `frameId` from the top stack frame.
-2. Display the result in a new `Watches` tab (following the pattern of the existing `Variables` tab).
-3. Call `evaluate` again after each `stopped` event to refresh watches automatically.
+1. Send an `evaluate` DAP request with the expression and `frameId` from the top stack frame.
+2. Ensure you pass the correct `socket` context if multiple debug sessions are active (common in Chrome/Node.js).
+3. Display the result in a new `Watches` tab (following the pattern of the existing `Variables` tab).
+4. Call `evaluate` again after each `stopped` event to refresh watches automatically.
 
 
 Languages are registered in `src/modules/languages.js`. Each entry maps a file extension to a lazy-loaded CodeMirror language package. Languages are split into two groups: plain languages (no Emmet) and Emmet-enabled languages:

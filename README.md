@@ -13,7 +13,7 @@
 <br/>
 
 [![Stars](https://img.shields.io/github/stars/adyanthm/axiom-desktop?style=for-the-badge&color=528bff&labelColor=1a1d23)](https://github.com/adyanthm/axiom-desktop)
-[![Version](https://img.shields.io/badge/version-0.1.10-528bff?style=for-the-badge&labelColor=1a1d23)](https://github.com/adyanthm/axiom-desktop)
+[![Version](https://img.shields.io/badge/version-0.2.0-528bff?style=for-the-badge&labelColor=1a1d23)](https://github.com/adyanthm/axiom-desktop)
 [![License](https://img.shields.io/badge/license-MIT-98c379?style=for-the-badge&labelColor=1a1d23)](./LICENSE.md)
 [![FOSS](https://img.shields.io/badge/FOSS-100%25-56b6c2?style=for-the-badge&labelColor=1a1d23)](#-free--open-source-software)
 [![Built With](https://img.shields.io/badge/backend-Rust%20%2B%20Tauri-e06c75?style=for-the-badge&labelColor=1a1d23)](https://tauri.app/)
@@ -317,7 +317,7 @@ When debugging JavaScript or HTML, a sleek **Target Picker** modal lets you choo
 
 When a debug session starts, a dedicated **PyCharm-style panel** slides in at the bottom of the editor with three tabs:
 
-- **Variables** — Live local variable inspector with support for expanding objects/arrays. Double-click any value to edit it directly in the running process.
+- **Variables** — Live local, closure, and global variable inspector with support for expanding objects/arrays. Double-click any value to edit it directly in the running process.
 - **Console** — Real-time stdout/stderr output from your script, complete with a **REPL prompt** to evaluate expressions live.
 - **Call Stack** — Every stack frame, top to bottom. Click any frame to instantly jump to its line and inspect its isolated variable scope!
 
