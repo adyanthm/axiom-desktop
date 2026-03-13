@@ -5,8 +5,8 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::process::Command;
 use tokio_tungstenite::tungstenite::Message;
 use tauri::{AppHandle, Manager, path::BaseDirectory};
-use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::path::PathBuf;
+use std::sync::Mutex;
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
 

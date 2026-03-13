@@ -16,6 +16,7 @@ struct AppState {
     live_server_port: Mutex<Option<u16>>,
     lsp_port: Mutex<Option<u16>>,
     debug_port: Mutex<Option<u16>>,
+    js_debug_port: Mutex<Option<u16>>,
 }
 
 #[derive(Serialize)]
@@ -249,6 +250,20 @@ async fn get_debug_port(app: tauri::AppHandle, state: tauri::State<'_, AppState>
     Ok(p)
 }
 
+#[tauri::command]
+async fn get_js_debug_port(app: tauri::AppHandle, state: tauri::State<'_, AppState>) -> Result<u16, String> {
+    {
+        let port_guard = state.js_debug_port.lock().unwrap();
+        if let Some(p) = *port_guard {
+            return Ok(p);
+        }
+    }
+    let p = debug::start_js_debug_server(app).await?;
+    let mut port_guard = state.js_debug_port.lock().unwrap();
+    *port_guard = Some(p);
+    Ok(p)
+}
+
 #[derive(Serialize, Clone)]
 pub struct SearchResult {
     path: String,
@@ -384,6 +399,7 @@ pub fn run() {
             notify_live_server,
             get_lsp_port,
             get_debug_port,
+            get_js_debug_port,
             global_search,
         ])
         .setup(|app| {
@@ -394,6 +410,7 @@ pub fn run() {
                 live_server_port: Mutex::new(None),
                 lsp_port: Mutex::new(None),
                 debug_port: Mutex::new(None),
+                js_debug_port: Mutex::new(None),
             });
             
             if cfg!(debug_assertions) {

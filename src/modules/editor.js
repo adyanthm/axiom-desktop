@@ -156,8 +156,8 @@ export function createEditorState(content, langExt = []) {
           if (typeof window.updateZoomOrigin === 'function') window.updateZoomOrigin();
           
           // Debounced status bar update to prevent UI stutter on high-speed typing
-          clearTimeout(this.sbTimeout);
-          this.sbTimeout = setTimeout(() => {
+          clearTimeout(window._sbTimeout);
+          window._sbTimeout = setTimeout(() => {
             import('./statusbar.js').then(m => m.updateStatus());
           }, 50);
         }

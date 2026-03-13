@@ -6,9 +6,9 @@
   "author": "Adyanth",
   "type": "module",
   "scripts": {
-    "predev": "node scripts/copy-pyright.js && node scripts/bundle-debugpy.js && node scripts/bundle-vtsls.js && node scripts/optimize-resources.js",
+    "predev": "node scripts/copy-pyright.js && node scripts/bundle-debugpy.js && node scripts/bundle-vtsls.js && node scripts/bundle-jsdebug.js && node scripts/optimize-resources.js",
     "dev": "vite",
-    "prebuild": "node scripts/copy-pyright.js && node scripts/bundle-debugpy.js && node scripts/bundle-vtsls.js && node scripts/optimize-resources.js",
+    "prebuild": "node scripts/copy-pyright.js && node scripts/bundle-debugpy.js && node scripts/bundle-vtsls.js && node scripts/bundle-jsdebug.js && node scripts/optimize-resources.js",
     "build": "vite build",
     "preview": "vite preview",
     "tauri": "tauri",

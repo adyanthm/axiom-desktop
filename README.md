@@ -256,7 +256,7 @@ Access it via `Ctrl+K, Ctrl+S` or **View → Keyboard Shortcuts**.
 | Next / Previous Tab | `Ctrl+Tab` / `Ctrl+Shift+Tab` |
 | Toggle Terminal | `` Ctrl+Shift+` `` |
 | Run File | `F5` / `Ctrl+Shift+R` |
-| **Start / Continue Debugger** | **`F5`** (Python files) |
+| **Start / Continue Debugger** | **`F5`** (Python/JS/HTML) |
 | **Step Over** | **`F10`** |
 | **Step Into** | **`F11`** |
 | **Step Out** | **`Shift+F11`** |
@@ -290,9 +290,11 @@ Axiom uses Rust's native `std::fs` via Tauri commands to read, write, and manage
 
 ---
 
-### 🐛 Python Debugger
+### 🐛 Integrated Debugger (Python & JavaScript)
 
-Axiom ships a **fully integrated Python debugger**, powered by [debugpy](https://github.com/microsoft/debugpy) and the [Debug Adapter Protocol (DAP)](https://microsoft.github.io/debug-adapter-protocol/). No extensions, no configuration files, no setup — just open a `.py` file and press `F5`.
+Axiom ships a **fully integrated Debugger** for Python, Node.js, and Chrome/Web applications, powered by [debugpy](https://github.com/microsoft/debugpy), [vscode-js-debug](https://github.com/microsoft/vscode-js-debug), and the [Debug Adapter Protocol (DAP)](https://microsoft.github.io/debug-adapter-protocol/). No extensions, no configuration files, no setup — just open a `.py`, `.js`, or `.html` file and press `F5`.
+
+When debugging JavaScript or HTML, a sleek **Target Picker** modal lets you choose between **Node.js** (backend debugging) or **Chrome** (frontend remote debugging).
 
 ![Debugger Demo](./media/debug.gif)
 
@@ -315,9 +317,9 @@ Axiom ships a **fully integrated Python debugger**, powered by [debugpy](https:/
 
 When a debug session starts, a dedicated **PyCharm-style panel** slides in at the bottom of the editor with three tabs:
 
-- **Variables** — Live local variable inspector. Double-click any value to edit it directly in the running Python process.
-- **Console** — Real-time stdout/stderr output from your script.
-- **Call Stack** — Every stack frame, top to bottom. The active frame is highlighted in blue.
+- **Variables** — Live local variable inspector with support for expanding objects/arrays. Double-click any value to edit it directly in the running process.
+- **Console** — Real-time stdout/stderr output from your script, complete with a **REPL prompt** to evaluate expressions live.
+- **Call Stack** — Every stack frame, top to bottom. Click any frame to instantly jump to its line and inspect its isolated variable scope!
 
 The panel is resizable (drag the top edge), and a color-coded status badge in the header shows `RUNNING` → `PAUSED` → `STOPPED` as your session progresses.
 
@@ -329,12 +331,12 @@ Hit `F5` or `Ctrl+Shift+R` to **auto-save and execute** the current file in the 
 
 | File Type | Action |
 |---|---|
-| `.py` | **Launch Python Debugger** (if breakpoints set) or `python` in terminal |
-| `.js` | `node` |
-| `.rs` | `rustc` → execute |
-| `.html` | Open in **Live Server** (auto-reload on save) |
+| `.py` | **Launch Python Debugger** |
+| `.js` / `.ts` | **Launch JS Debugger Picker (Node/Chrome)** |
+| `.rs` | `rustc` → execute in terminal |
+| `.html` | Open in **Live Server** or **Chrome Debugger** |
 
-> **Tip:** For Python files, `F5` always launches the full debugger with your breakpoints — no separate debug command needed.
+> **Tip:** For supported languages, the Bug icon (`F5`) always launches the full debugger with your breakpoints, REPL, and variable inspector.
 
 ---
 

@@ -2596,3 +2596,196 @@ body.zoom-active .cm-editor {
   color: inherit !important;
   font-weight: bold;
 }
+
+/* ── JS Debug Mode Picker ─────────────────────────────────────────────────── */
+#js-debug-picker-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+#js-debug-picker-overlay.hidden { display: none; }
+
+#js-debug-picker {
+  background: var(--bg-sidebar);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 28px 32px 24px;
+  width: 420px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255,255,255,0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  animation: pickerFadeIn 0.15s ease;
+}
+@keyframes pickerFadeIn {
+  from { opacity: 0; transform: translateY(-10px) scale(0.97); }
+  to   { opacity: 1; transform: none; }
+}
+.js-debug-picker-icon {
+  font-size: 32px;
+  color: #98C379;
+  text-align: center;
+}
+.js-debug-picker-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-active);
+  text-align: center;
+}
+.js-debug-picker-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: center;
+}
+.js-debug-picker-desc span {
+  color: var(--accent-color);
+  font-weight: 500;
+}
+.js-debug-picker-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.js-debug-option {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 8px;
+  background: var(--bg-hover);
+  border: 1px solid transparent;
+  cursor: pointer;
+  color: var(--text-main);
+  text-align: left;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+.js-debug-option:hover {
+  background: var(--bg-active);
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 1px rgba(82, 139, 255, 0.2);
+  color: var(--text-active);
+}
+.js-debug-option-icon {
+  font-size: 24px;
+  width: 32px;
+  text-align: center;
+  color: #98C379;
+  flex-shrink: 0;
+}
+#js-debug-chrome-btn .js-debug-option-icon { color: #E5C07B; }
+.js-debug-option-text { flex: 1; }
+.js-debug-option-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-active);
+  margin-bottom: 2px;
+}
+.js-debug-option-desc {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.js-debug-option-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 20px;
+  background: rgba(82,139,255,0.15);
+  color: var(--accent-color);
+  letter-spacing: 0.3px;
+  flex-shrink: 0;
+}
+.js-debug-cancel-btn {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 8px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  transition: color 0.15s, border-color 0.15s;
+  text-align: center;
+}
+.js-debug-cancel-btn:hover {
+  color: var(--text-main);
+  border-color: var(--text-muted);
+}
+
+/* ── Debug Console REPL Input ─────────────────────────────────────────────── */
+#debug-tab-console {
+  display: none;
+  flex-direction: column;
+  overflow: hidden;
+}
+#debug-tab-console.active {
+  display: flex !important;
+}
+#debug-console-output {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px 10px;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 12px;
+  line-height: 1.6;
+}
+#debug-console-input-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-sidebar);
+  flex-shrink: 0;
+}
+.debug-console-prompt {
+  color: var(--accent-color);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+#debug-console-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-active);
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 12px;
+  caret-color: var(--accent-color);
+}
+#debug-console-input::placeholder { color: var(--text-muted); }
+#debug-console-input-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  transition: color 0.15s, background 0.15s;
+}
+#debug-console-input-btn:hover {
+  color: var(--accent-color);
+  background: rgba(82,139,255,0.1);
+}
+
+/* ── Expandable variable tree ────────────────────────────────────────────── */
+.debug-var-expand {
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 9px;
+  margin-left: 4px;
+  transition: color 0.1s;
+}
+.debug-var-expand:hover { color: var(--accent-color); }
+.debug-var-child {
+  background: rgba(0,0,0,0.12);
+  border-left: 2px solid var(--accent-color);
+  opacity: 0.9;
+}
+.has-children { cursor: pointer; }

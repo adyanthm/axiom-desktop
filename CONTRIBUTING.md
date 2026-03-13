@@ -435,7 +435,8 @@ fn read_file_text(path: String) -> Result<String, String> {
 | `terminal_input` | Send input to the terminal | `input: String` |
 | `resize_terminal` | Resize the PTY | `rows: u16, cols: u16` |
 | `global_search` | Walk project and emit contents matching a query | `dir: String, query: String` |
-| `get_debug_port` | Start DAP WebSocket server, return port | *(none)* |
+| `get_debug_port` | Start Python DAP WebSocket server, return port | *(none)* |
+| `get_js_debug_port` | Start JS DAP WebSocket server, return port | *(none)* |
 | `start_lsp` | Start LSP server (Pyright or vtsls), return port | *(none)* |
 
 ### Language Server Protocol (LSP) Architecture
@@ -464,23 +465,27 @@ PTY output → Rust reader thread → emit('terminal-output') → xterm.js write
 
 ### Debugger Architecture
 
-Axiom's Python debugger is built on the **Debug Adapter Protocol (DAP)** — the same standard used by VS Code. It connects to [debugpy](https://github.com/microsoft/debugpy), which is bundled in `src-tauri/resources/debugpy/` and requires only a standard Python installation at runtime.
+Axiom's debugging architecture is built on the **Debug Adapter Protocol (DAP)** — the same standard used by VS Code. The IDE natively bundles two debugging backends:
+- **Python**: Uses [debugpy](https://github.com/microsoft/debugpy) bundled in `src-tauri/resources/debugpy/`
+- **JavaScript (Node/Chrome)**: Uses [vscode-js-debug](https://github.com/microsoft/vscode-js-debug) bundled in `src-tauri/resources/jsdebug/`
+
+Both backends share the exact same Rust bridge architecture and frontend DAP client.
 
 ```
 User presses F5
    │
    ▼
-[Frontend] debug.js calls invoke('get_debug_port')
+[Frontend] debug.js calls invoke('get_debug_port' or 'get_js_debug_port')
    │
    ▼
 [Rust] debug.rs binds a WebSocket server on a random port,
-       then spawns: python -m debugpy.adapter
+       then spawns either `python -m debugpy.adapter` or `node dapDebugServer.js --stdio`
    │
    ▼
 [Frontend] Opens WebSocket to ws://127.0.0.1:{port}
    │
    ▼
-[Rust] Bridges WebSocket ↔ debugpy stdin/stdout
+[Rust] Bridges WebSocket ↔ process stdin/stdout
    │   (strips DAP HTTP-style headers, passes raw JSON)
    ▼
 [Frontend] Sends DAP requests (initialize → launch → setBreakpoints → configurationDone)
@@ -496,10 +501,11 @@ On 'stopped': frontend requests stackTrace + scopes + variables
 
 | File | Role |
 |---|---|
-| `src-tauri/src/debug.rs` | Rust — WebSocket server, spawns debugpy, bridges stdio |
-| `src/modules/debug.js` | JS — DAP client, debug panel UI, variable editing |
+| `src-tauri/src/debug.rs` | Rust — WebSocket server, spawns DAP adapter (Python/JS), bridges stdio |
+| `src/modules/debug.js` | JS — DAP client, debug panel UI, variable editing, JS target picker |
 | `src/modules/breakpoints.js` | JS — CodeMirror gutter extension, breakpoint state, line highlighting |
 | `src-tauri/resources/debugpy/` | Bundled Python debugpy package |
+| `src-tauri/resources/jsdebug/` | Bundled Vscode JS Debug server |
 
 **To extend the debugger** (e.g., add watch expressions):
 1. Send a `evaluate` DAP request with the expression and `frameId` from the top stack frame.

@@ -2,20 +2,23 @@ import { invoke } from '@tauri-apps/api/core';
 import { state } from './state.js';
 import { view } from './editor.js';
 import { getBreakpointsForFile, highlightDebugLine } from './breakpoints.js';
+import { saveFile } from './files.js';
+import { startLiveServer } from './runner.js';
 
 let debugSocket = null;
+let currentDebugPort = null;
 let seqCounter = 1;
 const pendingRequests = new Map();
-let isRunning = false; // true while a debug session is live
+let isRunning = false;
+let currentDebugType = 'python'; // 'python' | 'node' | 'chrome'
 
 // ── Panel Elements ──────────────────────────────────────────────────────────
-const debugPanel    = document.getElementById('debug-panel');
-const consoleEl     = document.getElementById('debug-console-output');
-const varsEl        = document.getElementById('debug-variables-list');
-const stackEl       = document.getElementById('debug-callstack-list');
+const debugPanel = document.getElementById('debug-panel');
+const consoleEl  = document.getElementById('debug-console-output');
+const varsEl     = document.getElementById('debug-variables-list');
+const stackEl    = document.getElementById('debug-callstack-list');
 
-// ── Session State Badge ─────────────────────────────────────────────────────
-// Inject a small status badge into the tab bar
+// ── Session Status Badge ────────────────────────────────────────────────────
 const statusBadge = document.createElement('span');
 statusBadge.id = 'debug-session-badge';
 statusBadge.style.cssText = `
@@ -30,9 +33,6 @@ document.getElementById('debug-panel-tabs')?.insertBefore(
 function setStatus(label, color) {
   statusBadge.textContent = label;
   statusBadge.style.display = label ? 'inline-flex' : 'none';
-  statusBadge.style.color = color || '#61AFEF';
-  statusBadge.style.background = (color || '#61AFEF').replace(')', ', 0.12)').replace('rgb', 'rgba').replace('#', 'rgba(') || 'rgba(97,175,239,0.12)';
-  // Simple preset colours
   const presets = {
     'RUNNING':  { bg: 'rgba(152,195,121,0.12)', fg: '#98C379' },
     'PAUSED':   { bg: 'rgba(229,192,123,0.15)', fg: '#E5C07B' },
@@ -46,19 +46,13 @@ function setStatus(label, color) {
 }
 
 // ── Show / Hide ─────────────────────────────────────────────────────────────
-function showPanel() {
-  debugPanel?.classList.remove('hidden');
-}
-
+function showPanel() { debugPanel?.classList.remove('hidden'); }
 export function hidePanel() {
-  // Clean up any live highlighting when user manually closes
-  if (isRunning) {
-    highlightDebugLine(view, -1);
-  }
+  if (isRunning) highlightDebugLine(view, -1);
   debugPanel?.classList.add('hidden');
 }
 
-// ── Tab Switching ─────────────────────────────────────────────────────────────
+// ── Tab Switching ────────────────────────────────────────────────────────────
 document.querySelectorAll('.debug-tab').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.debug-tab').forEach(b => b.classList.remove('active'));
@@ -68,7 +62,7 @@ document.querySelectorAll('.debug-tab').forEach(btn => {
   });
 });
 
-// ── Resizable Panel (drag top edge) ─────────────────────────────────────────
+// ── Resizable panel ──────────────────────────────────────────────────────────
 (function initResize() {
   let dragging = false, startY = 0, startH = 0;
   debugPanel?.addEventListener('mousedown', e => {
@@ -86,13 +80,10 @@ document.querySelectorAll('.debug-tab').forEach(btn => {
   document.addEventListener('mouseup', () => { dragging = false; });
 })();
 
-// ── Console Helpers ───────────────────────────────────────────────────────────
-// Strip ANSI escape codes so raw text renders cleanly
+// ── Console Helpers ──────────────────────────────────────────────────────────
 function stripAnsi(str) {
-  // eslint-disable-next-line no-control-regex
   return str.replace(/\x1b\[[0-9;]*[mGKHF]/g, '');
 }
-
 function consolePrint(raw, type = 'out') {
   if (!consoleEl) return;
   const text = stripAnsi(raw);
@@ -105,13 +96,37 @@ function consolePrint(raw, type = 'out') {
   consoleEl.appendChild(span);
   consoleEl.scrollTop = consoleEl.scrollHeight;
 }
+function consoleClear() { if (consoleEl) consoleEl.innerHTML = ''; }
 
-function consoleClear() {
-  if (consoleEl) consoleEl.innerHTML = '';
+// ── REPL Console Input ────────────────────────────────────────────────────────
+const consoleInput = document.getElementById('debug-console-input');
+const consoleInputBtn = document.getElementById('debug-console-input-btn');
+async function evalExpression(expr) {
+  if (!expr?.trim() || !debugSocket || debugSocket.readyState !== WebSocket.OPEN) return;
+  consolePrint(`> ${expr}\n`, 'info');
+  try {
+    const res = await sendDapRequest('evaluate', {
+      expression: expr,
+      context: 'repl',
+      frameId: currentFrameId ?? undefined,
+    });
+    if (res?.result !== undefined) consolePrint(`${res.result}\n`, 'out');
+  } catch (e) {
+    consolePrint(`Error: ${e}\n`, 'err');
+  }
+}
+if (consoleInput) {
+  consoleInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); evalExpression(consoleInput.value); consoleInput.value = ''; }
+  });
+}
+if (consoleInputBtn) {
+  consoleInputBtn.addEventListener('click', () => { evalExpression(consoleInput?.value); if (consoleInput) consoleInput.value = ''; });
 }
 
 // ── Variables Renderer (with inline editing) ─────────────────────────────────
-let currentVarsRef = 0; // variablesReference of the current locals scope
+let currentVarsRef = 0;
+let currentFrameId = null;
 
 function renderVariables(vars, hint) {
   if (!varsEl) return;
@@ -128,80 +143,88 @@ function renderVariables(vars, hint) {
     varsEl.innerHTML += `<span class="debug-empty-hint">No local variables in this scope.</span>`;
     return;
   }
-  // Filter out dunder items
-  const visible = vars.filter(v => !v.name.startsWith('__') || v.name === '__name__');
+  // Filter Python dunder noise; JS shows __proto__ etc
+  const visible = currentDebugType === 'python'
+    ? vars.filter(v => !v.name.startsWith('__') || v.name === '__name__')
+    : vars.filter(v => !['__proto__', 'constructor'].includes(v.name)).slice(0, 100);
+
   visible.forEach(v => {
     const row = document.createElement('div');
     row.className = 'debug-var-row';
     const safeVal = String(v.value).replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-    const nameEl  = document.createElement('span');
+    const nameEl = document.createElement('span');
     nameEl.className = 'debug-var-name';
     nameEl.title = v.name;
     nameEl.textContent = v.name;
 
-    const typeEl  = document.createElement('span');
+    const typeEl = document.createElement('span');
     typeEl.className = 'debug-var-type';
     typeEl.textContent = v.type || '';
 
-    const valEl   = document.createElement('span');
+    const valEl = document.createElement('span');
     valEl.className = 'debug-var-value editable-value';
     valEl.title = 'Double-click to edit';
     valEl.innerHTML = safeVal;
 
-    // ── Inline edit on double-click ──────────────────────────────────────────
+    // Expandable children (objects/arrays)
+    if (v.variablesReference && v.variablesReference > 0) {
+      valEl.classList.add('has-children');
+      const chevron = document.createElement('span');
+      chevron.className = 'debug-var-expand';
+      chevron.textContent = ' ▶';
+      nameEl.appendChild(chevron);
+      let expanded = false;
+      chevron.addEventListener('click', async e => {
+        e.stopPropagation();
+        if (expanded) {
+          expanded = false; chevron.textContent = ' ▶';
+          row.querySelectorAll('.debug-var-child').forEach(c => c.remove());
+          return;
+        }
+        try {
+          const res = await sendDapRequest('variables', { variablesReference: v.variablesReference });
+          (res?.variables || []).slice(0, 50).forEach(child => {
+            const childRow = document.createElement('div');
+            childRow.className = 'debug-var-row debug-var-child';
+            childRow.innerHTML = `<span class="debug-var-name" style="padding-left:24px">${child.name}</span><span class="debug-var-type">${child.type || ''}</span><span class="debug-var-value">${String(child.value).replace(/</g,'&lt;').replace(/>/g,'&gt;')}</span>`;
+            row.after(childRow);
+          });
+          expanded = true; chevron.textContent = ' ▼';
+        } catch {}
+      });
+    }
+
+    // Inline edit on double-click
     valEl.addEventListener('dblclick', e => {
       e.stopPropagation();
-      if (valEl.querySelector('input')) return; // already editing
-
-      const originalText = v.value;
+      if (valEl.querySelector('input')) return;
       const input = document.createElement('input');
       input.className = 'debug-var-input';
-      input.value = originalText;
-      input.type = 'text';
-      input.autocomplete = 'off';
-      input.spellcheck = false;
-
-      valEl.innerHTML = '';
-      valEl.appendChild(input);
-      valEl.classList.add('editing');
-      input.focus();
-      input.select();
+      input.value = v.value;
+      input.autocomplete = 'off'; input.spellcheck = false;
+      valEl.innerHTML = ''; valEl.appendChild(input); valEl.classList.add('editing');
+      input.focus(); input.select();
 
       const commit = async () => {
         const newVal = input.value.trim();
         valEl.classList.remove('editing');
-
-        if (newVal === originalText) {
-          // No change — just restore
-          valEl.innerHTML = safeVal;
-          return;
-        }
-
-        // Show spinner while waiting
+        if (newVal === v.value) { valEl.innerHTML = safeVal; return; }
         valEl.innerHTML = `<span class="debug-var-setting">setting…</span>`;
-
         try {
           await sendDapRequest('setVariable', {
             variablesReference: currentVarsRef,
             name: v.name,
             value: newVal,
           });
-          // Re-fetch and re-render
           const fresh = await sendDapRequest('variables', { variablesReference: currentVarsRef });
           renderVariables(fresh?.variables || []);
         } catch (err) {
-          // Show error inline, restore after 2s
           valEl.innerHTML = `<span class="debug-var-error" title="${err}">⚠ error</span>`;
           setTimeout(() => { valEl.innerHTML = safeVal; }, 2000);
         }
       };
-
-      const cancel = () => {
-        valEl.classList.remove('editing');
-        valEl.innerHTML = safeVal;
-      };
-
+      const cancel = () => { valEl.classList.remove('editing'); valEl.innerHTML = safeVal; };
       input.addEventListener('keydown', e => {
         if (e.key === 'Enter')  { e.preventDefault(); commit(); }
         if (e.key === 'Escape') { e.preventDefault(); cancel(); }
@@ -209,14 +232,12 @@ function renderVariables(vars, hint) {
       input.addEventListener('blur', () => setTimeout(cancel, 150));
     });
 
-    row.appendChild(nameEl);
-    row.appendChild(typeEl);
-    row.appendChild(valEl);
+    row.appendChild(nameEl); row.appendChild(typeEl); row.appendChild(valEl);
     varsEl.appendChild(row);
   });
 }
 
-// ── Call Stack Renderer ───────────────────────────────────────────────────────
+// ── Call Stack Renderer ──────────────────────────────────────────────────────
 function renderCallStack(frames, hint) {
   if (!stackEl) return;
   if (hint !== undefined) {
@@ -232,72 +253,71 @@ function renderCallStack(frames, hint) {
     row.innerHTML = `
       <span class="debug-frame-name">${frame.name}</span>
       <span class="debug-frame-location">${loc}</span>`;
+    // Click to jump to frame
+    row.addEventListener('click', async () => {
+      document.querySelectorAll('.debug-frame-row').forEach(r => r.classList.remove('active'));
+      row.classList.add('active');
+      await jumpToFrame(frame);
+    });
     stackEl.appendChild(row);
   });
 }
 
-// ── Finish Summary (PyCharm-style) ───────────────────────────────────────────
-function showFinishedState(exitedWithError) {
+async function jumpToFrame(frame) {
+  if (!frame) return;
+  // Highlight line (source map already resolved by js-debug)
+  if (frame.line > 0) highlightDebugLine(view, frame.line);
+
+  // Fetch variables for this specific frame
+  try {
+    const scopeRes = await sendDapRequest('scopes', { frameId: frame.id });
+    const scopes = scopeRes?.scopes || [];
+    const locals = scopes.find(s => s.presentationHint === 'locals')
+                || scopes.find(s => !s.expensive)
+                || scopes[0];
+    if (locals) {
+      currentVarsRef = locals.variablesReference;
+      currentFrameId = frame.id;
+      const varRes = await sendDapRequest('variables', { variablesReference: currentVarsRef });
+      renderVariables(varRes?.variables || []);
+    }
+  } catch {}
+}
+
+// ── Finish State ────────────────────────────────────────────────────────────
+function showFinishedState(error = false) {
   isRunning = false;
   highlightDebugLine(view, -1);
   setStatus('STOPPED');
-
-  // Console gets a clear summary footer
   consolePrint('\n─────────────────────────────────\n', 'info');
-  consolePrint(exitedWithError
-    ? 'Process finished with a non-zero exit code.\n'
-    : 'Process finished successfully.\n', 'info');
-  // Switch to console tab so user sees output
+  consolePrint(error ? 'Process finished with a non-zero exit code.\n' : 'Process finished successfully.\n', 'info');
   document.querySelector('.debug-tab[data-tab="console"]')?.click();
-
-  // Variables & Call Stack show idle placeholders  
   renderVariables(null, 'Session ended. Start a new debug session to inspect variables.');
   renderCallStack(null, 'No active frames. The process has exited.');
 }
 
-// ── On Pause: Fetch Full Debug State ─────────────────────────────────────────
-async function onPaused(threadId) {
+// ── On Pause ─────────────────────────────────────────────────────────────────
+async function onPaused(threadId, socket) {
   setStatus('PAUSED');
-  // Switch to variables tab automatically
   document.querySelector('.debug-tab[data-tab="variables"]')?.click();
-
   try {
-    const res = await sendDapRequest('stackTrace', { threadId });
+    const res = await sendDapRequest('stackTrace', { threadId, levels: 50 }, socket);
     const frames = res?.stackFrames || [];
-    renderCallStack(frames);
-
+    renderCallStack(frames, undefined, socket);
     if (frames.length > 0) {
-      const top = frames[0];
-      highlightDebugLine(view, top.line);
+      currentFrameId = frames[0].id;
+      await jumpToFrame(frames[0], socket);
       const { EditorView } = await import('@codemirror/view');
-      if (view.state.doc.lines >= top.line) {
-        view.dispatch({
-          effects: EditorView.scrollIntoView(view.state.doc.line(top.line).from, { y: 'center' })
-        });
-      }
-
-      // Fetch local variables
-      const scopeRes = await sendDapRequest('scopes', { frameId: top.id });
-      const scopes = scopeRes?.scopes || [];
-      const locals = scopes.find(s => s.name === 'Locals')
-                  || scopes.find(s => !s.expensive)
-                  || scopes[0];
-      if (locals) {
-        currentVarsRef = locals.variablesReference; // track for edits
-        const varRes = await sendDapRequest('variables', { variablesReference: currentVarsRef });
-        renderVariables(varRes?.variables || []);
-      } else {
-        currentVarsRef = 0;
-        renderVariables([]);
+      const line = frames[0].line;
+      if (line > 0 && view.state.doc.lines >= line) {
+        view.dispatch({ effects: EditorView.scrollIntoView(view.state.doc.line(line).from, { y: 'center' }) });
       }
     }
-  } catch (e) {
-    console.error('Failed to fetch debug state', e);
-  }
+  } catch (e) { console.error('Failed to fetch debug state', e); }
 }
 
-// ── DAP Message Handler ───────────────────────────────────────────────────────
-function handleDapMessage(msg) {
+// ── DAP Message Handler ──────────────────────────────────────────────────────
+function handleDapMessage(msg, socket) {
   if (msg.type === 'response') {
     const def = pendingRequests.get(msg.request_seq);
     if (def) {
@@ -306,12 +326,14 @@ function handleDapMessage(msg) {
     }
 
   } else if (msg.type === 'event') {
-
     if (msg.event === 'initialized') {
       const file = state.currentFile;
       const bps = getBreakpointsForFile(file).map(line => ({ line }));
-      sendDapRequest('setBreakpoints', { source: { path: file }, breakpoints: bps })
-        .then(() => sendDapRequest('configurationDone', {}))
+      sendDapRequest('setBreakpoints', {
+        source: { path: file },
+        breakpoints: bps,
+      }, socket)
+        .then(() => sendDapRequest('configurationDone', {}, socket))
         .catch(console.error);
 
     } else if (msg.event === 'output') {
@@ -322,114 +344,275 @@ function handleDapMessage(msg) {
       consolePrint(text, msg.body.category === 'stderr' ? 'err' : 'out');
 
     } else if (msg.event === 'stopped') {
-      onPaused(msg.body.threadId);
+      onPaused(msg.body.threadId, socket);
 
     } else if (msg.event === 'continued') {
-      // Don't wipe variables/stack — just clear highlight and show running state
       setStatus('RUNNING');
       highlightDebugLine(view, -1);
 
     } else if (msg.event === 'terminated' || msg.event === 'exited') {
-      showFinishedState(false);
+      const hasError = msg.body?.exitCode !== undefined && msg.body.exitCode !== 0;
+      showFinishedState(hasError);
       debugSocket = null;
+    }
+  } else if (msg.type === 'request') {
+    if (msg.command === 'startDebugging') {
+      sendDapResponse(msg.seq, msg.command, true, {}, socket);
+      // Open the actual debugging session (multiplexed on the same port)
+      if (currentDebugPort) {
+        connectDebugSocket(currentDebugPort, () => {
+          sendDapRequest('initialize', {
+            clientID: 'axiom', clientName: 'Axiom IDE', adapterID: currentDebugType === 'node' ? 'pwa-node' : 'pwa-chrome',
+            pathFormat: 'path', linesStartAt1: true, columnsStartAt1: true,
+            supportsRunInTerminalRequest: false,
+            supportsSetVariable: true,
+            supportsEvaluateForHovers: true,
+          }).then(() => sendDapRequest('launch', msg.arguments.configuration))
+            .catch(e => console.error('Child session launch failed', e));
+        });
+      }
     }
   }
 }
 
-// ── DAP WebSocket ─────────────────────────────────────────────────────────────
-export async function startDebugging() {
-  const file = state.currentFile;
-  if (!file?.endsWith('.py')) {
-    showPanel();
-    consoleClear();
-    consolePrint('Only Python (.py) files can be debugged.\n', 'err');
-    return;
-  }
+// ── WS Connection & DAP Framing ──────────────────────────────────────────────
+function connectDebugSocket(port, onOpen) {
+  currentDebugPort = port;
+  // Multi-session support: We don't close the old socket here, 
+  // we just let the new one take over the global 'debugSocket' for UI commands.
+  // The old (broker) socket stays alive in the background to keep the process running.
+  const socket = new WebSocket(`ws://127.0.0.1:${port}`);
+  debugSocket = socket;
+  activeSockets.push(socket);
+  let buffer = '';
 
-  // Reset UI for new session
+  debugSocket.onopen  = onOpen;
+  debugSocket.onmessage = event => {
+    buffer += event.data;
+    while (buffer.length > 0) {
+      buffer = buffer.trimStart();
+      if (!buffer.startsWith('{')) { buffer = ''; break; }
+      let braces = 0, endIdx = -1, inStr = false, esc = false;
+      for (let i = 0; i < buffer.length; i++) {
+        const c = buffer[i];
+        if (esc) { esc = false; continue; }
+        if (c === '\\') { esc = true; continue; }
+        if (c === '"') { inStr = !inStr; continue; }
+        if (!inStr) {
+          if (c === '{') braces++;
+          else if (c === '}' && --braces === 0) { endIdx = i; break; }
+        }
+      }
+      if (endIdx === -1) break;
+      const jsonStr = buffer.substring(0, endIdx + 1);
+      buffer = buffer.substring(endIdx + 1);
+      try { handleDapMessage(JSON.parse(jsonStr), socket); }
+      catch (e) { console.error('DAP parse error', e); }
+    }
+  };
+  debugSocket.onerror = () => { consolePrint('WebSocket error.\n', 'err'); setStatus('ERROR'); };
+  debugSocket.onclose = () => {
+    if (isRunning) { highlightDebugLine(view, -1); setStatus('STOPPED'); isRunning = false; }
+  };
+}
+
+const activeSockets = [];
+
+function close() {
+  activeSockets.forEach(s => { if (s.readyState === WebSocket.OPEN) s.close(); });
+  activeSockets.length = 0;
+  debugSocket = null;
+}
+
+// ── Launch: Python ───────────────────────────────────────────────────────────
+async function startPythonDebugging() {
+  const file = state.currentFile;
   consoleClear();
-  renderVariables(null, 'Launching debugger…');
+  renderVariables(null, 'Launching Python debugger…');
   renderCallStack(null, 'Waiting for process to start…');
   showPanel();
   setStatus('RUNNING');
   isRunning = true;
-
-  // Always start on console so user sees output
+  currentDebugType = 'python';
   document.querySelector('.debug-tab[data-tab="console"]')?.click();
-  consolePrint(`Debugging: ${file}\n`, 'info');
+  consolePrint(`Debugging (Python): ${file}\n`, 'info');
   consolePrint('─────────────────────────────────\n', 'info');
 
   try {
     const port = await invoke('get_debug_port');
-    debugSocket = new WebSocket(`ws://127.0.0.1:${port}`);
-    let buffer = '';
-
-    debugSocket.onopen = () => {
+    connectDebugSocket(port, () => {
       sendDapRequest('initialize', {
-        clientID: 'axiom',
-        clientName: 'Axiom IDE',
-        adapterID: 'python',
-        pathFormat: 'path',
-        linesStartAt1: true,
-        columnsStartAt1: true,
+        clientID: 'axiom', clientName: 'Axiom IDE', adapterID: 'python',
+        pathFormat: 'path', linesStartAt1: true, columnsStartAt1: true,
         supportsRunInTerminalRequest: false,
       }).then(() => sendDapRequest('launch', {
-        program: file,
-        cwd: state.rootDirPath || '',
-        console: 'internalConsole',
-        justMyCode: false,
-      })).catch(e => {
-        consolePrint(`Launch failed: ${e}\n`, 'err');
-        setStatus('ERROR');
-      });
-    };
-
-    debugSocket.onmessage = event => {
-      buffer += event.data;
-      while (buffer.length > 0) {
-        buffer = buffer.trimStart();
-        if (!buffer.startsWith('{')) { buffer = ''; break; }
-        let braces = 0, endIdx = -1, inStr = false, esc = false;
-        for (let i = 0; i < buffer.length; i++) {
-          const c = buffer[i];
-          if (esc) { esc = false; continue; }
-          if (c === '\\') { esc = true; continue; }
-          if (c === '"') { inStr = !inStr; continue; }
-          if (!inStr) {
-            if (c === '{') braces++;
-            else if (c === '}' && --braces === 0) { endIdx = i; break; }
-          }
-        }
-        if (endIdx === -1) break;
-        const jsonStr = buffer.substring(0, endIdx + 1);
-        buffer = buffer.substring(endIdx + 1);
-        try { handleDapMessage(JSON.parse(jsonStr)); }
-        catch (e) { console.error('DAP parse error', e); }
-      }
-    };
-
-    debugSocket.onerror = () => {
-      consolePrint('Connection error.\n', 'err');
-      setStatus('ERROR');
-    };
-    // onclose fires after terminated event; we already handled cleanup there.
-    // But guard against unexpected disconnects.
-    debugSocket.onclose = () => {
-      if (isRunning) {
-        highlightDebugLine(view, -1);
-        setStatus('STOPPED');
-        isRunning = false;
-      }
-    };
-
+        program: file, cwd: state.rootDirPath || '', console: 'internalConsole', justMyCode: false,
+      })).catch(e => { consolePrint(`Launch failed: ${e}\n`, 'err'); setStatus('ERROR'); });
+    });
   } catch (e) {
-    consolePrint(`Failed to start debugger: ${e}\n`, 'err');
-    setStatus('ERROR');
-    isRunning = false;
+    consolePrint(`Failed to start Python debugger: ${e}\n`, 'err');
+    setStatus('ERROR'); isRunning = false;
   }
 }
 
-// ── Stop ──────────────────────────────────────────────────────────────────────
+// ── Launch: Node.js ──────────────────────────────────────────────────────────
+async function startNodeDebugging() {
+  const file = state.currentFile;
+  await saveFile();
+  consoleClear();
+  renderVariables(null, 'Launching Node.js debugger…');
+  renderCallStack(null, 'Waiting for process to start…');
+  showPanel();
+  setStatus('RUNNING');
+  isRunning = true;
+  currentDebugType = 'node';
+  document.querySelector('.debug-tab[data-tab="console"]')?.click();
+  consolePrint(`Debugging (Node.js): ${file}\n`, 'info');
+  consolePrint('─────────────────────────────────\n', 'info');
+
+  try {
+    const port = await invoke('get_js_debug_port');
+    connectDebugSocket(port, () => {
+      sendDapRequest('initialize', {
+        clientID: 'axiom', clientName: 'Axiom IDE', adapterID: 'pwa-node',
+        pathFormat: 'path', linesStartAt1: true, columnsStartAt1: true,
+        supportsRunInTerminalRequest: false,
+        supportsSetVariable: true,
+        supportsEvaluateForHovers: true,
+        supportsStepInTargetsRequest: false,
+      }).then(() => sendDapRequest('launch', {
+        type: 'pwa-node',
+        request: 'launch',
+        name: 'Axiom Node.js Debug',
+        program: file,
+        cwd: state.rootDirPath || file.substring(0, Math.max(file.lastIndexOf('/'), file.lastIndexOf('\\')) + 1) || '',
+        stopOnEntry: true,
+        console: 'internalConsole',
+        internalConsoleOptions: 'neverOpen',
+        skipFiles: ['<node_internals>/**'],
+        sourceMaps: true,
+        resolveSourceMapLocations: ['${workspaceFolder}/**', '!**/node_modules/**'],
+      })).catch(e => { consolePrint(`Launch failed: ${e}\n`, 'err'); setStatus('ERROR'); });
+    });
+  } catch (e) {
+    consolePrint(`Failed to start Node debugger: ${e}\n`, 'err');
+    setStatus('ERROR'); isRunning = false;
+  }
+}
+
+// ── Launch: Chrome ───────────────────────────────────────────────────────────
+async function startChromeDebugging() {
+  const file = state.currentFile;
+  await saveFile();
+  consoleClear();
+  renderVariables(null, 'Launching Chrome debugger…');
+  renderCallStack(null, 'Waiting for browser to start…');
+  showPanel();
+  setStatus('RUNNING');
+  isRunning = true;
+  currentDebugType = 'chrome';
+  document.querySelector('.debug-tab[data-tab="console"]')?.click();
+  consolePrint(`Debugging (Chrome): ${file}\n`, 'info');
+  consolePrint('─────────────────────────────────\n', 'info');
+
+  // Find the live server URL or fall back to file://
+  const liveServerPort = 5500;
+  let url;
+  if (file.endsWith('.html')) {
+    // Try to start the live server for the HTML file
+    try {
+      await startLiveServer(file);
+      const serveDir = state.rootDirPath || '';
+      let rel = file.substring(serveDir.length).replace(/\\/g, '/');
+      if (rel.startsWith('/')) rel = rel.substring(1);
+      url = `http://localhost:${liveServerPort}/${rel}`;
+    } catch {
+      url = `file:///${file.replace(/\\/g, '/')}`;
+    }
+  } else {
+    url = `http://localhost:${liveServerPort}/`;
+  }
+
+  try {
+    const port = await invoke('get_js_debug_port');
+    connectDebugSocket(port, () => {
+      sendDapRequest('initialize', {
+        clientID: 'axiom', clientName: 'Axiom IDE', adapterID: 'pwa-chrome',
+        pathFormat: 'path', linesStartAt1: true, columnsStartAt1: true,
+        supportsRunInTerminalRequest: false,
+        supportsSetVariable: true,
+        supportsEvaluateForHovers: true,
+      }).then(() => sendDapRequest('launch', {
+        type: 'pwa-chrome',
+        request: 'launch',
+        name: 'Axiom Chrome Debug',
+        url,
+        webRoot: state.rootDirPath || file.substring(0, Math.max(file.lastIndexOf('/'), file.lastIndexOf('\\')) + 1) || '',
+        stopOnEntry: true,
+        sourceMaps: true,
+        skipFiles: ['<node_internals>/**'],
+        userDataDir: false, // use default Chrome profile
+      })).catch(e => { consolePrint(`Launch failed: ${e}\n`, 'err'); setStatus('ERROR'); });
+    });
+  } catch (e) {
+    consolePrint(`Failed to start Chrome debugger: ${e}\n`, 'err');
+    setStatus('ERROR'); isRunning = false;
+  }
+}
+
+// ── Debug Picker (JS files) ──────────────────────────────────────────────────
+const pickerOverlay = document.getElementById('js-debug-picker-overlay');
+const pickerFileName = document.getElementById('js-debug-file-name');
+
+function showJsDebugPicker() {
+  return new Promise(resolve => {
+    const file = state.currentFile;
+    if (pickerFileName) pickerFileName.textContent = file?.split(/[/\\]/).pop() || 'file.js';
+    pickerOverlay?.classList.remove('hidden');
+
+    const onNode = () => { cleanup(); resolve('node'); };
+    const onChrome = () => { cleanup(); resolve('chrome'); };
+    const onCancel = () => { cleanup(); resolve(null); };
+
+    const nodeBtn   = document.getElementById('js-debug-node-btn');
+    const chromeBtn = document.getElementById('js-debug-chrome-btn');
+    const cancelBtn = document.getElementById('js-debug-cancel-btn');
+
+    nodeBtn?.addEventListener('click',   onNode,   { once: true });
+    chromeBtn?.addEventListener('click', onChrome, { once: true });
+    cancelBtn?.addEventListener('click', onCancel, { once: true });
+
+    function cleanup() {
+      pickerOverlay?.classList.add('hidden');
+      nodeBtn?.removeEventListener('click', onNode);
+      chromeBtn?.removeEventListener('click', onChrome);
+      cancelBtn?.removeEventListener('click', onCancel);
+    }
+  });
+}
+
+// ── Main Entry Point ─────────────────────────────────────────────────────────
+export async function startDebugging() {
+  const file = state.currentFile;
+  if (!file) return;
+  const ext = file.split('.').pop()?.toLowerCase();
+
+  if (ext === 'py') {
+    await startPythonDebugging();
+  } else if (['js', 'mjs', 'ts', 'tsx', 'jsx', 'html'].includes(ext)) {
+    await saveFile();
+    const mode = await showJsDebugPicker();
+    if (!mode) return;
+    if (mode === 'node') await startNodeDebugging();
+    else if (mode === 'chrome') await startChromeDebugging();
+  } else {
+    showPanel();
+    consoleClear();
+    consolePrint(`Cannot debug .${ext} files.\nSupported: Python (.py), JavaScript (.js/.ts/.jsx/.tsx), HTML (Chrome).\n`, 'err');
+  }
+}
+
+// ── Stop ─────────────────────────────────────────────────────────────────────
 export function stopDebugging() {
   if (debugSocket?.readyState === WebSocket.OPEN) {
     sendDapRequest('disconnect', { terminateDebuggee: true }).catch(() => {});
@@ -438,23 +621,31 @@ export function stopDebugging() {
   showFinishedState(false);
 }
 
-// ── DAP Request ───────────────────────────────────────────────────────────────
-export function sendDapRequest(command, args) {
+// ── DAP Request ──────────────────────────────────────────────────────────────
+export function sendDapRequest(command, args, socket = null) {
+  const targetSocket = socket || debugSocket;
   return new Promise((resolve, reject) => {
-    if (!debugSocket || debugSocket.readyState !== WebSocket.OPEN) {
+    if (!targetSocket || targetSocket.readyState !== WebSocket.OPEN) {
       reject('Socket not open'); return;
     }
     const seq = seqCounter++;
     pendingRequests.set(seq, { resolve, reject });
-    debugSocket.send(JSON.stringify({ seq, type: 'request', command, arguments: args }));
+    targetSocket.send(JSON.stringify({ seq, type: 'request', command, arguments: args }));
   });
 }
 
-// ── Button Listeners ──────────────────────────────────────────────────────────
-document.getElementById('debug-continue')?.addEventListener('click',   () => sendDapRequest('continue', { threadId: 1 }).catch(() => {}));
-document.getElementById('debug-step-over')?.addEventListener('click',  () => sendDapRequest('next',     { threadId: 1 }).catch(() => {}));
-document.getElementById('debug-step-into')?.addEventListener('click',  () => sendDapRequest('stepIn',   { threadId: 1 }).catch(() => {}));
-document.getElementById('debug-step-out')?.addEventListener('click',   () => sendDapRequest('stepOut',  { threadId: 1 }).catch(() => {}));
-document.getElementById('debug-stop')?.addEventListener('click',         stopDebugging);
-document.getElementById('debug-panel-close')?.addEventListener('click',  hidePanel);
-document.getElementById('debug-editor-btn')?.addEventListener('click',   startDebugging);
+export function sendDapResponse(requestSeq, command, success = true, body = {}, socket = null) {
+  const targetSocket = socket || debugSocket;
+  if (!targetSocket || targetSocket.readyState !== WebSocket.OPEN) return;
+  const seq = seqCounter++;
+  targetSocket.send(JSON.stringify({ seq, type: 'response', request_seq: requestSeq, command, success, body }));
+}
+
+// ── Button Listeners ─────────────────────────────────────────────────────────
+document.getElementById('debug-continue')?.addEventListener('click',  () => sendDapRequest('continue', { threadId: 1 }).catch(() => {}));
+document.getElementById('debug-step-over')?.addEventListener('click', () => sendDapRequest('next',     { threadId: 1 }).catch(() => {}));
+document.getElementById('debug-step-into')?.addEventListener('click', () => sendDapRequest('stepIn',   { threadId: 1 }).catch(() => {}));
+document.getElementById('debug-step-out')?.addEventListener('click',  () => sendDapRequest('stepOut',  { threadId: 1 }).catch(() => {}));
+document.getElementById('debug-stop')?.addEventListener('click',          stopDebugging);
+document.getElementById('debug-panel-close')?.addEventListener('click',   hidePanel);
+document.getElementById('debug-editor-btn')?.addEventListener('click',    startDebugging);

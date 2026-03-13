@@ -160,6 +160,11 @@
             <!-- Tab: Console Output -->
             <div id="debug-tab-console" class="debug-tab-content">
               <div id="debug-console-output"></div>
+              <div id="debug-console-input-bar">
+                <span class="debug-console-prompt">&gt;</span>
+                <input id="debug-console-input" type="text" placeholder="Evaluate expression..." autocomplete="off" spellcheck="false" />
+                <button id="debug-console-input-btn" title="Evaluate"><i class="fa-solid fa-paper-plane"></i></button>
+              </div>
             </div>
             <!-- Tab: Call Stack -->
             <div id="debug-tab-callstack" class="debug-tab-content">
@@ -278,6 +283,33 @@
       </div>
     </div>
 
+
+    <!-- JS Debug Mode Picker -->
+    <div id="js-debug-picker-overlay" class="hidden">
+      <div id="js-debug-picker">
+        <div class="js-debug-picker-icon"><i class="fa-brands fa-node-js"></i></div>
+        <div class="js-debug-picker-title">Debug JavaScript</div>
+        <div class="js-debug-picker-desc">Choose a debugging target for <span id="js-debug-file-name">file.js</span></div>
+        <div class="js-debug-picker-options">
+          <button class="js-debug-option" id="js-debug-node-btn">
+            <div class="js-debug-option-icon"><i class="fa-brands fa-node-js"></i></div>
+            <div class="js-debug-option-text">
+              <div class="js-debug-option-title">Node.js</div>
+              <div class="js-debug-option-desc">Run &amp; debug with node --inspect</div>
+            </div>
+            <div class="js-debug-option-badge">Default</div>
+          </button>
+          <button class="js-debug-option" id="js-debug-chrome-btn">
+            <div class="js-debug-option-icon"><i class="fa-brands fa-chrome"></i></div>
+            <div class="js-debug-option-text">
+              <div class="js-debug-option-title">Chrome / Web</div>
+              <div class="js-debug-option-desc">Launch browser with remote debugging</div>
+            </div>
+          </button>
+        </div>
+        <button class="js-debug-cancel-btn" id="js-debug-cancel-btn">Cancel</button>
+      </div>
+    </div>
 
   </div>
   <script type="module" src="/src/main.js"></script>

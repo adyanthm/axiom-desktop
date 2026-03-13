@@ -68,7 +68,8 @@ export async function openFile(filePath, focusEditor = true) {
     ea.style.display = 'flex';
     const debugBtn = document.getElementById('debug-editor-btn');
     if (debugBtn) {
-      debugBtn.style.display = filePath.toLowerCase().endsWith('.py') ? 'inline-block' : 'none';
+      const isDebuggable = /\.(py|js|ts|jsx|tsx|html|htm)$/i.test(filePath);
+      debugBtn.style.display = isDebuggable ? 'inline-block' : 'none';
     }
   }
   const bc = document.getElementById('editor-breadcrumb');
