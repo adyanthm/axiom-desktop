@@ -14,6 +14,7 @@ export const keybindings = [
   { id: 'editor.outdent',            command: 'Outdent Line',               keys: 'Shift+Tab',       source: 'Default' },
   { id: 'workbench.quickOpen',       command: 'Go to File',                 keys: 'Ctrl+P',          source: 'Default' },
   { id: 'workbench.commandPalette',  command: 'Open Command Palette',       keys: 'Ctrl+Shift+P',    source: 'Default' },
+  { id: 'workbench.colorTheme',      command: 'Color Theme',                keys: 'Ctrl+K Ctrl+T',   source: 'Default' },
   { id: 'workbench.openKeybindings', command: 'Open Keyboard Shortcuts',    keys: 'Ctrl+K Ctrl+S',   source: 'Default' },
   { id: 'workbench.newFile',         command: 'New File',                   keys: 'Ctrl+N',          source: 'Default' },
   { id: 'workbench.save',            command: 'Save',                       keys: 'Ctrl+S',          source: 'Default' },

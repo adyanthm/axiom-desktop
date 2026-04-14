@@ -1223,6 +1223,20 @@ body {
   border: none;
 }
 
+/* ── Gutters (Line Numbers) ── */
+.cm-gutters {
+  background: transparent !important;
+  color: var(--text-muted) !important;
+  border: none !important;
+  outline: none !important;
+}
+.cm-activeLineGutter {
+  background: transparent !important;
+  color: var(--text-active) !important;
+  border: none !important;
+  outline: none !important;
+}
+
 /* ── Glow Effects ── */
 body.glow-effect .cm-line span:not(.cm-comment) {
   text-shadow: 0 0 2px currentColor, 0 0 4px currentColor, 0 0 5px currentColor;
@@ -1447,6 +1461,28 @@ body.zoom-active .cm-editor {
   max-width: 50%;
   text-align: right;
 }
+
+/* ── Theme Picker Items ── */
+.theme-swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  margin-right: 10px;
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.theme-item-label {
+  flex: 1;
+}
+
+.theme-item-check {
+  margin-left: auto;
+  color: var(--accent-color);
+  font-size: 11px;
+}
+
 
 /* ── Keymap Panel ── */
 #keymap-overlay {

@@ -13,7 +13,7 @@
 <br/>
 
 [![Stars](https://img.shields.io/github/stars/adyanthm/axiom-desktop?style=for-the-badge&color=528bff&labelColor=1a1d23)](https://github.com/adyanthm/axiom-desktop)
-[![Version](https://img.shields.io/badge/version-0.2.0-528bff?style=for-the-badge&labelColor=1a1d23)](https://github.com/adyanthm/axiom-desktop)
+[![Version](https://img.shields.io/badge/version-0.2.1-528bff?style=for-the-badge&labelColor=1a1d23)](https://github.com/adyanthm/axiom-desktop)
 [![License](https://img.shields.io/badge/license-MIT-98c379?style=for-the-badge&labelColor=1a1d23)](./LICENSE.md)
 [![FOSS](https://img.shields.io/badge/FOSS-100%25-56b6c2?style=for-the-badge&labelColor=1a1d23)](#-free--open-source-software)
 [![Built With](https://img.shields.io/badge/backend-Rust%20%2B%20Tauri-e06c75?style=for-the-badge&labelColor=1a1d23)](https://tauri.app/)
@@ -234,6 +234,37 @@ Everything in Axiom is accessible from the Command Palette — a VS Code-style q
 ![Command Palette](./media/cmd.gif)
 
 Commands available include file operations, visual effects toggles, terminal control, keybinding settings, and more. No mouse required.
+
+---
+
+### 🌈 Color Themes
+
+Axiom ships with **7 highly polished editor themes** to match your desktop aesthetic, powered by dynamic CSS variable injection and CodeMirror reconfigurations.
+
+| Theme | Type |
+|---|---|
+| One Dark Pro | Dark (Default) |
+| VS Code Dark+ | Dark |
+| GitHub Dark | Dark |
+| Tokyo Night | Dark |
+| Dracula | Dark |
+| Nord | Dark |
+| Monokai | Dark |
+
+Change them anytime from the Command Palette (`Preferences: Color Theme`), where they **live-preview instantly** as you arrow through the list. Your selection is automatically persisted and natively injected right as the app opens to prevent flashing unstyled content.
+
+---
+
+### ⚙️ Editor Behaviors
+
+Axiom includes robust developer conveniences natively without requiring external extensions.
+
+| Feature | Details |
+|---|---|
+| **Auto Close Brackets/Quotes** | Intelligently auto-completes `()`, `[]`, `{}`, `""` and manages closing HTML/XML tags. |
+| **Indent Guides** | Visual block scope markers that natively align with code structure indentation. |
+
+These are easily toggled from the Command Palette under `Preferences: Toggle Editor Features`.
 
 ---
 

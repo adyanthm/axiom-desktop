@@ -2,6 +2,8 @@ import { state } from './state.js';
 import { pathBasename } from './utils.js';
 import { getFileIcon } from './icons.js';
 import { view } from './editor.js';
+import { THEMES, previewTheme, applyTheme, cancelPreview, getActiveThemeId } from './themes.js';
+import { stateFeatures, toggleAutoClose, toggleIndentGuides } from './features.js';
 
 const commandOverlay = document.getElementById('command-palette-overlay');
 const commandInput   = document.getElementById('command-input');
@@ -13,6 +15,8 @@ const commands = [
   { id: 'toggle-rgb-text',         label: 'Preferences: Toggle RGB Text Effect' },
   { id: 'toggle-glow',             label: 'Preferences: Toggle Neon Glow Effect' },
   { id: 'toggle-rgb-glow',         label: 'Preferences: Toggle RGB Moving Glow Effect' },
+  { id: 'change-theme',            label: 'Preferences: Color Theme' },
+  { id: 'change-features',         label: 'Preferences: Toggle Editor Features' },
   { id: 'open-keybindings',        label: 'Preferences: Open Keyboard Shortcuts' },
   { id: 'change-live-server-port', label: 'Live Server: Change Port' },
   { id: 'open-folder',             label: 'File: Open Folder...' },
@@ -34,18 +38,35 @@ const commands = [
 let filteredCmds = [];
 let selIdx = 0;
 let paletteFileCache = null;
+let _themePickerMode = false;  // true when palette is in theme-picker mode
+let _featurePickerMode = false; // true when palette is in feature-picker mode
 
 // ── Palette UI Toggles ────────────────────────────────────────────────────────
 export function togglePalette(forceClose = false, mode = 'command') {
   if (forceClose || commandOverlay.classList.contains('active')) {
+    // If we were previewing a theme and didn't commit, revert
+    if (_themePickerMode) { cancelPreview(); _themePickerMode = false; }
     commandOverlay.classList.remove('active');
     view.focus();
     paletteFileCache = null;
   } else {
     commandOverlay.classList.add('active');
     paletteFileCache = null;
-    commandInput.value = mode === 'command' ? '>' : '';
-    renderPalette(commandInput.value);
+    _themePickerMode = mode === 'theme';
+    _featurePickerMode = mode === 'features';
+    if (mode === 'theme') {
+      commandInput.value = '';
+      commandInput.placeholder = 'Select a color theme (type to filter)...';
+      _renderThemePicker('');
+    } else if (mode === 'features') {
+      commandInput.value = '';
+      commandInput.placeholder = 'Toggle features...';
+      _renderFeaturePicker('');
+    } else {
+      commandInput.value = mode === 'command' ? '>' : '';
+      commandInput.placeholder = 'Type a command...';
+      renderPalette(commandInput.value);
+    }
     setTimeout(() => commandInput.focus(), 50);
   }
 }
@@ -99,10 +120,20 @@ function _paintList() {
 
     if (cmd.isFile) {
       const dirPart = cmd.sublabel.includes('/') || cmd.sublabel.includes('\\')
-        ? cmd.sublabel.split(/[\\\/]/).slice(0, -1).join('/')
+        ? cmd.sublabel.split(/[\\/]/).slice(0, -1).join('/')
         : '';
       el.innerHTML = `${getFileIcon(cmd.label)}<span style="margin-left:8px">${cmd.label}</span>` +
                      (dirPart ? `<span class="palette-path">${dirPart}</span>` : '');
+    } else if (cmd.isTheme) {
+      const active = cmd.id === 'apply-theme:' + getActiveThemeId();
+      el.innerHTML =
+        `<span class="theme-swatch" style="background:${cmd.swatch};"></span>` +
+        `<span class="theme-item-label">${cmd.label}</span>` +
+        (active ? `<i class="fa-solid fa-check theme-item-check"></i>` : '');
+    } else if (cmd.isFeature) {
+      el.innerHTML =
+        `<span class="theme-item-label">${cmd.label}</span>` +
+        `<i class="fa-solid fa-toggle-${cmd.active ? 'on' : 'off'} theme-item-check" style="color:var(--${cmd.active ? 'accent-color' : 'text-muted'})"></i>`;
     } else {
       el.innerHTML = cmd.label;
     }
@@ -112,18 +143,72 @@ function _paintList() {
       document.querySelectorAll('.palette-item').forEach(x => x.classList.remove('active'));
       el.classList.add('active');
       selIdx = i;
+      // Live-preview theme on hover
+      if (cmd.isTheme) previewTheme(cmd.themeId);
     });
 
     paletteList.appendChild(el);
   });
 }
 
+// ── Theme Picker Rendering ────────────────────────────────────────────────────
+function _renderThemePicker(q) {
+  const s = q.toLowerCase();
+  filteredCmds = THEMES
+    .filter(t => t.label.toLowerCase().includes(s))
+    .map(t => ({
+      id: 'apply-theme:' + t.id,
+      label: t.label,
+      isTheme: true,
+      swatch: t.ui['--bg-main'],
+      themeId: t.id,
+    }));
+  _paintList();
+  // Preview first item immediately
+  if (filteredCmds.length > 0) previewTheme(filteredCmds[0].themeId);
+}
+
+// ── Feature Picker Rendering ──────────────────────────────────────────────────
+function _renderFeaturePicker(q) {
+  const s = q.toLowerCase();
+  const list = [
+    { id: 'toggle-feat-autoclose', label: 'Feature: Auto Close Brackets & Quotes', active: stateFeatures.autoClose, isFeature: true },
+    { id: 'toggle-feat-indent', label: 'Feature: Indent Guides (Lines under functions)', active: stateFeatures.indentGuides, isFeature: true }
+  ];
+  filteredCmds = list.filter(f => f.label.toLowerCase().includes(s));
+  _paintList();
+}
+
 // ── Execution Router ──────────────────────────────────────────────────────────
 export async function execCmd(id) {
-  togglePalette(true);
+  if (!id.startsWith('apply-theme:') && !id.startsWith('toggle-feat-')) {
+    togglePalette(true);
+  }
+
+  if (id === 'change-features') { togglePalette(false, 'features'); return; }
+
+  if (id === 'toggle-feat-autoclose') {
+    await toggleAutoClose();
+    _renderFeaturePicker(commandInput.value);
+    return;
+  }
+  if (id === 'toggle-feat-indent') {
+    await toggleIndentGuides();
+    _renderFeaturePicker(commandInput.value);
+    return;
+  }
 
   if (id.startsWith('open-file:')) {
     import('./files.js').then(m => m.openFile(id.slice(10)));
+    return;
+  }
+
+  if (id.startsWith('apply-theme:')) {
+    const themeId = id.slice(12);
+    _themePickerMode = false;
+    commandOverlay.classList.remove('active');
+    view.focus();
+    await applyTheme(themeId);
     return;
   }
 
@@ -146,6 +231,7 @@ export async function execCmd(id) {
     case 'toggle-rgb-glow': import('./effects.js').then(m => m.toggleRgbGlow()); break;
     case 'toggle-rgb-text': import('./effects.js').then(m => m.toggleRgbText()); break;
     case 'toggle-zoom':     import('./effects.js').then(m => m.toggleZoom()); break;
+    case 'change-theme':    togglePalette(false, 'theme'); break;
 
     // Zoom & Scale
     case 'editor-zoom-in':    import('./zoom.js').then(m => m.zoomIn()); break;
@@ -179,7 +265,9 @@ export async function execCmd(id) {
 
 // ── Keybindings for Palette Input ─────────────────────────────────────────────
 commandInput.addEventListener('input', e => {
-  if (paletteFileCache || e.target.value.startsWith('>')) {
+  if (_themePickerMode) {
+    _renderThemePicker(e.target.value);
+  } else if (paletteFileCache || e.target.value.startsWith('>')) {
       renderPalette(e.target.value);
   } else {
      // Trigger load of cache via renderPalette on first keystroke
@@ -189,6 +277,7 @@ commandInput.addEventListener('input', e => {
 
 commandInput.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
+    if (_themePickerMode) cancelPreview();
     togglePalette(true);
   }
   else if (e.key === 'ArrowDown') {
@@ -198,6 +287,10 @@ commandInput.addEventListener('keydown', e => {
       const items = document.querySelectorAll('.palette-item');
       items.forEach((el, i) => el.classList.toggle('active', i === selIdx));
       items[selIdx]?.scrollIntoView({ block: 'nearest' });
+      // Live-preview on arrow navigation in theme mode
+      if (_themePickerMode && filteredCmds[selIdx]?.isTheme) {
+        previewTheme(filteredCmds[selIdx].themeId);
+      }
     }
   }
   else if (e.key === 'ArrowUp') {
@@ -207,6 +300,10 @@ commandInput.addEventListener('keydown', e => {
       const items = document.querySelectorAll('.palette-item');
       items.forEach((el, i) => el.classList.toggle('active', i === selIdx));
       items[selIdx]?.scrollIntoView({ block: 'nearest' });
+      // Live-preview on arrow navigation in theme mode
+      if (_themePickerMode && filteredCmds[selIdx]?.isTheme) {
+        previewTheme(filteredCmds[selIdx].themeId);
+      }
     }
   }
   else if (e.key === 'Enter') {
@@ -216,5 +313,8 @@ commandInput.addEventListener('keydown', e => {
 });
 
 commandOverlay.addEventListener('click', e => {
-  if (e.target === commandOverlay) togglePalette(true);
+  if (e.target === commandOverlay) {
+    if (_themePickerMode) cancelPreview();
+    togglePalette(true);
+  }
 });

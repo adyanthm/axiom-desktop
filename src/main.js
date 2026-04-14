@@ -15,7 +15,11 @@ import './modules/contextmenu.js';
 import './modules/debug.js';
 import './modules/search.js';
 import { initZoom } from './modules/zoom.js';
+import { initTheme } from './modules/themes.js';
+import { initFeatures } from './modules/features.js';
 initZoom();
+initTheme();
+initFeatures();
 
 // ── Sidebar Resizer ──────────────────────────────────────────────────────────
 const resizer = document.getElementById('resizer');

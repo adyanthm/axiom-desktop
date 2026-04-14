@@ -73,6 +73,7 @@ function handleMenu(action) {
     case 'toggle-rgb-glow':   execCmd('toggle-rgb-glow'); break;
     case 'toggle-rgb-text':   execCmd('toggle-rgb-text'); break;
     case 'toggle-zoom':       execCmd('toggle-zoom'); break;
+    case 'change-theme':      togglePalette(false, 'theme'); break;
 
     case 'go-to-file':        togglePalette(false, 'file'); break;
     case 'global-search':     import('./search.js').then(m => m.openGlobalSearch()); break;
@@ -124,6 +125,7 @@ window.addEventListener('keydown', async e => {
   if (ctrlKPending) {
     if (ctrl && k === 's') { e.preventDefault(); ctrlKPending = false; openKeymapSettings(); return; }
     if (ctrl && k === 'o') { e.preventDefault(); ctrlKPending = false; openFolder(); return; }
+    if (ctrl && k === 't') { e.preventDefault(); ctrlKPending = false; togglePalette(false, 'theme'); return; }
     ctrlKPending = false; // Reset if some other key is pressed
   }
 

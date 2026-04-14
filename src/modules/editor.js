@@ -15,7 +15,8 @@ function emmetExpand(view) {
   if (!EMMET_EXTS.has(ext)) return false;
   return expandAbbreviation(view);
 }
-import { oneDark } from '@codemirror/theme-one-dark';
+import { themeCompartmentInit } from './themes.js';
+import { autoCloseCompartmentInit, indentGuidesCompartmentInit } from './features.js';
 import { autocompletion } from '@codemirror/autocomplete';
 import { searchKeymap, search } from '@codemirror/search';
 import { foldGutter, foldKeymap } from '@codemirror/language';
@@ -127,7 +128,9 @@ export function createEditorState(content, langExt = []) {
       ]),
       longLineExtension,
       langExt,
-      oneDark,
+      themeCompartmentInit(),
+      autoCloseCompartmentInit(),
+      indentGuidesCompartmentInit(),
       EditorView.lineWrapping,
       EditorView.updateListener.of((update) => {
         if (update.docChanged && state.currentFile) {

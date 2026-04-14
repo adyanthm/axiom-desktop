@@ -583,6 +583,13 @@ All effect styles are defined in `style.css`. Effects are **mutually exclusive**
 - Editor font zooming works by updating `--cm-font-size` on the editor view and forcing a structural layout reset with `view.requestMeasure()`
 - Total UI scaling is handled by modifying the `zoom` CSS property directly on `document.body` instead of a CSS transformation. This causes full boundary reflow natively.
 
+### Themes & Editor Behaviors
+
+The editor's theming and behaviors (like indent guides and auto-close brackets) are managed via **CodeMirror Compartments** in `themes.js` and `features.js`.
+- **Dynamic Reconfiguration:** Because CodeMirror 6 states are immutable, compartments allow us to inject or remove extensions (like `closeBrackets()`) on the fly without unmounting the DOM or losing cursor position.
+- **State Synchronization:** Using `_applyToAllFiles()`, changing a theme or feature iterates over `state.fileEditorStates` (background tabs) and explicitly `.update({ effects: ... })`s them, ensuring consistency across the entire IDE.
+- **Persistence:** All preferences are asynchronously written to disk using `tauri-plugin-store`.
+
 ### Command Palette System
 
 The palette has two modes:
@@ -637,6 +644,13 @@ When submitting a PR, verify the following still work:
 - [ ] `Ctrl+P` → fuzzy file search works
 - [ ] Arrow keys + Enter to select
 - [ ] Escape to close
+
+**Preferences & Themes:**
+- [ ] Run `Preferences: Color Theme` → arrow keys dynamically live-preview themes
+- [ ] Select theme → theme applies and persists across app restarts
+- [ ] Run `Preferences: Toggle Editor Features` → toggles apply instantly across all open tabs
+- [ ] Auto Close Brackets toggle functions correctly during typing
+- [ ] Indent Guides appear accurately beneath functional blocks
 
 **Global Search:**
 - [ ] `Ctrl+Shift+F` → Search panel opens

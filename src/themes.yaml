@@ -1,0 +1,155 @@
+# Axiom Editor – Theme Registry
+# Each entry defines a theme available in the command palette / theme picker.
+#
+# Fields:
+#   id        – unique key used in store and JS imports (must match the JS loader key)
+#   label     – display name shown in the picker
+#   kind      – "dark" or "light" (controls which icon/badge is shown)
+#   package   – npm package to import the CM6 theme extension from
+#   export    – named export within that package (or "default")
+#
+# UI palette overrides (applied to CSS variables when theme is active):
+#   bg_main, bg_sidebar, bg_tabs, bg_hover, bg_active,
+#   border_color, text_main, text_muted, text_active,
+#   accent_color, context_bg, context_border, context_hover, context_text
+
+themes:
+  - id: one-dark
+    label: One Dark Pro
+    kind: dark
+    package: "@codemirror/theme-one-dark"
+    export: oneDark
+    bg_main: "#282c34"
+    bg_sidebar: "#21252b"
+    bg_tabs: "#181a1f"
+    bg_hover: "#2c313a"
+    bg_active: "#3a3f4b"
+    border_color: "#181a1f"
+    text_main: "#abb2bf"
+    text_muted: "#7f848e"
+    text_active: "#d7dae0"
+    accent_color: "#528bff"
+    context_bg: "#252526"
+    context_border: "#454545"
+    context_hover: "#094771"
+    context_text: "#cccccc"
+
+  - id: vscode-dark
+    label: VS Code Dark+
+    kind: dark
+    package: "@uiw/codemirror-theme-vscode"
+    export: vscodeDark
+    bg_main: "#1e1e1e"
+    bg_sidebar: "#252526"
+    bg_tabs: "#181818"
+    bg_hover: "#2a2d2e"
+    bg_active: "#37373d"
+    border_color: "#1e1e1e"
+    text_main: "#d4d4d4"
+    text_muted: "#858585"
+    text_active: "#ffffff"
+    accent_color: "#007acc"
+    context_bg: "#252526"
+    context_border: "#454545"
+    context_hover: "#094771"
+    context_text: "#cccccc"
+
+  - id: tokyo-night
+    label: Tokyo Night
+    kind: dark
+    package: "@uiw/codemirror-theme-tokyo-night"
+    export: tokyoNight
+    bg_main: "#1a1b26"
+    bg_sidebar: "#16161e"
+    bg_tabs: "#0f0f14"
+    bg_hover: "#1f2335"
+    bg_active: "#292e42"
+    border_color: "#0f0f14"
+    text_main: "#a9b1d6"
+    text_muted: "#565f89"
+    text_active: "#c0caf5"
+    accent_color: "#7aa2f7"
+    context_bg: "#1f2335"
+    context_border: "#292e42"
+    context_hover: "#2d3f76"
+    context_text: "#a9b1d6"
+
+  - id: dracula
+    label: Dracula
+    kind: dark
+    package: "@uiw/codemirror-theme-dracula"
+    export: dracula
+    bg_main: "#282a36"
+    bg_sidebar: "#21222c"
+    bg_tabs: "#191a21"
+    bg_hover: "#2d2f3f"
+    bg_active: "#44475a"
+    border_color: "#191a21"
+    text_main: "#f8f8f2"
+    text_muted: "#6272a4"
+    text_active: "#ffffff"
+    accent_color: "#bd93f9"
+    context_bg: "#21222c"
+    context_border: "#44475a"
+    context_hover: "#44475a"
+    context_text: "#f8f8f2"
+
+  - id: nord
+    label: Nord
+    kind: dark
+    package: "@uiw/codemirror-theme-nord"
+    export: nord
+    bg_main: "#2e3440"
+    bg_sidebar: "#272c36"
+    bg_tabs: "#1e2128"
+    bg_hover: "#353b45"
+    bg_active: "#3b4252"
+    border_color: "#1e2128"
+    text_main: "#d8dee9"
+    text_muted: "#616e88"
+    text_active: "#eceff4"
+    accent_color: "#88c0d0"
+    context_bg: "#272c36"
+    context_border: "#3b4252"
+    context_hover: "#4c566a"
+    context_text: "#d8dee9"
+
+  - id: monokai
+    label: Monokai
+    kind: dark
+    package: "@uiw/codemirror-theme-monokai"
+    export: monokai
+    bg_main: "#272822"
+    bg_sidebar: "#1e1f1c"
+    bg_tabs: "#141411"
+    bg_hover: "#2c2d27"
+    bg_active: "#3e3d32"
+    border_color: "#141411"
+    text_main: "#f8f8f2"
+    text_muted: "#75715e"
+    text_active: "#ffffff"
+    accent_color: "#a6e22e"
+    context_bg: "#1e1f1c"
+    context_border: "#3e3d32"
+    context_hover: "#4e4e3e"
+    context_text: "#f8f8f2"
+
+  - id: github-dark
+    label: GitHub Dark
+    kind: dark
+    package: "@uiw/codemirror-theme-github"
+    export: githubDark
+    bg_main: "#0d1117"
+    bg_sidebar: "#161b22"
+    bg_tabs: "#010409"
+    bg_hover: "#1c2128"
+    bg_active: "#21262d"
+    border_color: "#010409"
+    text_main: "#c9d1d9"
+    text_muted: "#8b949e"
+    text_active: "#e6edf3"
+    accent_color: "#58a6ff"
+    context_bg: "#161b22"
+    context_border: "#30363d"
+    context_hover: "#1f6feb"
+    context_text: "#c9d1d9"
